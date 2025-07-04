@@ -16,6 +16,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.google.firebase.firestore.FirebaseFirestore
 
 @Composable
 fun SignUpScreen(navController: NavController) {
@@ -135,10 +136,37 @@ fun SignUpScreen(navController: NavController) {
                             } else if (password != passwordCheck) {
                                 Toast.makeText(context, "비밀번호가 일치하지 않습니다.", Toast.LENGTH_SHORT).show()
                             } else {
-                                Toast.makeText(context, "회원가입 완료!", Toast.LENGTH_SHORT).show()
-                                navController.popBackStack("login", inclusive = false)
-                                // 실제 회원가입 처리 로직 추가 가능
-
+                                // 1. Firestore에서 아이디(문서ID) 중복 체크
+                                FirebaseFirestore.getInstance()
+                                    .collection("users")
+                                    .document(id)
+                                    .get()
+                                    .addOnSuccessListener { document ->
+                                        if (document.exists()) {
+                                            Toast.makeText(context, "이미 사용 중인 아이디입니다.", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            // 2. 중복이 아니면 회원가입 진행
+                                            val userInfo = hashMapOf(
+                                                "name" to name,
+                                                "id" to id,
+                                                "password" to password
+                                            )
+                                            FirebaseFirestore.getInstance()
+                                                .collection("users")
+                                                .document(id)
+                                                .set(userInfo)
+                                                .addOnSuccessListener {
+                                                    Toast.makeText(context, "회원가입 완료!", Toast.LENGTH_SHORT).show()
+                                                    navController.popBackStack("login", inclusive = false)
+                                                }
+                                                .addOnFailureListener {
+                                                    Toast.makeText(context, "회원정보 저장 실패", Toast.LENGTH_SHORT).show()
+                                                }
+                                        }
+                                    }
+                                    .addOnFailureListener {
+                                        Toast.makeText(context, "네트워크 오류: ${it.message}", Toast.LENGTH_SHORT).show()
+                                    }
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),

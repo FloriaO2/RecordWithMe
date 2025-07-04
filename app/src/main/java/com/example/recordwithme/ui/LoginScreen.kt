@@ -21,11 +21,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.recordwithme.R
+import com.google.firebase.firestore.FirebaseFirestore
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
 
 @Composable
 fun LoginScreen(onLoginSuccess: () -> Unit, navController: NavController) {
     var id by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    val context = LocalContext.current
 
     Box(
         modifier = Modifier.fillMaxSize()
@@ -67,7 +71,28 @@ fun LoginScreen(onLoginSuccess: () -> Unit, navController: NavController) {
             )
             Spacer(modifier = Modifier.height(24.dp))
             Button(
-                onClick = { onLoginSuccess() },
+                onClick = {
+                    FirebaseFirestore.getInstance()
+                        .collection("users")
+                        .document(id)
+                        .get()
+                        .addOnSuccessListener { document ->
+                            if (document.exists()) {
+                                val savedPassword = document.getString("password")
+                                if (savedPassword == password) {
+                                    Toast.makeText(context, "로그인 성공!", Toast.LENGTH_SHORT).show()
+                                    onLoginSuccess()
+                                } else {
+                                    Toast.makeText(context, "비밀번호가 일치하지 않습니다.", Toast.LENGTH_SHORT).show()
+                                }
+                            } else {
+                                Toast.makeText(context, "존재하지 않는 아이디입니다.", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                        .addOnFailureListener {
+                            Toast.makeText(context, "네트워크 오류: ${it.message}", Toast.LENGTH_SHORT).show()
+                        }
+                },
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFFFC0CB)),
                 shape = RoundedCornerShape(20.dp)

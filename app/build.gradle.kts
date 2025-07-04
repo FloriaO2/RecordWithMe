@@ -3,7 +3,6 @@ plugins {
     alias(libs.plugins.kotlin.android)
     id("org.jetbrains.kotlin.plugin.compose") version "2.0.0"
     alias(libs.plugins.google.gms.google.services)
-    id("com.google.gms.google-services") // Firebase용
 }
 
 android {
@@ -48,6 +47,7 @@ android {
 }
 
 dependencies {
+    implementation("com.google.accompanist:accompanist-flowlayout:0.30.1")
     implementation("androidx.activity:activity-compose:1.7.2")
     implementation("androidx.compose.ui:ui:1.5.3")
     implementation("androidx.compose.material:material:1.5.3")

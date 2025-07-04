@@ -17,42 +17,45 @@ import com.example.recordwithme.R
 
 @Composable
 fun TopBar(onMenuClick: () -> Unit) {
-    TopAppBar(
-        backgroundColor = MaterialTheme.colors.background,
-        elevation = 0.dp,
-        title = {
+    Surface(
+        color = MaterialTheme.colors.background,
+        elevation = 0.dp
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(70.dp) // 원하는 높이로 조절
+        ) {
+            // 왼쪽: 로고
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(start = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // 왼쪽 로고와 텍스트
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.logo),
-                        contentDescription = "앱 로고",
-                        modifier = Modifier
-                            .height(35.dp)
-                    )
-                    
-                    Text(
-                        text = "RecordWithMe",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Black
-                    )
-                }
-
-                // 오른쪽 메뉴 버튼
-                IconButton(onClick = onMenuClick) {
-                    Icon(Icons.Default.Menu, contentDescription = "메뉴")
-                }
+                Image(
+                    painter = painterResource(id = R.drawable.logo),
+                    contentDescription = "앱 로고",
+                    modifier = Modifier.height(35.dp)
+                )
             }
-        },
-        navigationIcon = null, // 왼쪽 메뉴 아이콘 제거
-        actions = {} // 오른쪽 actions 제거
-    )
+
+            // 가운데: 텍스트
+            Text(
+                text = "RecordWithMe",
+                fontSize = 20.sp,
+                color = Color.Black,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.align(Alignment.Center)
+            )
+
+            // 오른쪽: 메뉴 버튼
+            IconButton(
+                onClick = onMenuClick,
+                modifier = Modifier.align(Alignment.CenterEnd)
+            ) {
+                Icon(Icons.Default.Menu, contentDescription = "메뉴")
+            }
+        }
+    }
 }

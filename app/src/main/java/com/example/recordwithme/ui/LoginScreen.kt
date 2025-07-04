@@ -92,6 +92,10 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(24.dp))
             Button(
                 onClick = {
+                    if (id.isBlank() || password.isBlank()) {
+                        Toast.makeText(context, "아이디와 비밀번호를 모두 입력하세요.", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
                     FirebaseFirestore.getInstance()
                         .collection("users")
                         .document(id)
@@ -117,19 +121,8 @@ fun LoginScreen(
                 colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFFFC0CB)),
                 shape = RoundedCornerShape(20.dp)
             ) {
-                Text("로그인", fontWeight = FontWeight.Bold)
+                Text("기존 계정으로 로그인", fontWeight = FontWeight.Bold, color = Color.White)
             }
-
-            Text(
-                text = "계정이 없으신가요? 회원가입",
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF1976D2),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { navController.navigate("signup") }
-                    .padding(vertical = 16.dp),
-                textAlign = TextAlign.Center
-            )
 
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -146,6 +139,17 @@ fun LoginScreen(
                     fontWeight = FontWeight.Bold
                 )
             }
+
+            Text(
+                text = "계정이 없으신가요? 회원가입",
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF1976D2),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { navController.navigate("signup") }
+                    .padding(vertical = 16.dp),
+                textAlign = TextAlign.Center
+            )
         }
     }
 }

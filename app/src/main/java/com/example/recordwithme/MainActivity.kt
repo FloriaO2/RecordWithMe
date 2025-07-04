@@ -22,6 +22,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.recordwithme.ui.BottomNavigationBar
 import com.example.recordwithme.ui.DrawerContainer
@@ -40,10 +41,14 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
 
+
+
 class MainActivity : ComponentActivity() {
     private lateinit var googleSignInClient: GoogleSignInClient
     private val viewModel: AuthViewModel by viewModels()
     private val auth: FirebaseAuth by lazy { Firebase.auth }
+
+
 
     private val googleSignInLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -77,6 +82,11 @@ class MainActivity : ComponentActivity() {
             val user by viewModel.authenticatedUser.collectAsState()
             val context = LocalContext.current
             var drawerOpen by remember { mutableStateOf(false) }
+            val currentBackStackEntry by navController.currentBackStackEntryAsState()
+            val currentRoute = currentBackStackEntry?.destination?.route
+            val isAuthScreen = currentRoute == "login" || currentRoute == "signup"
+
+
 
             // 로그인 시 토스트 메시지 표시
             LaunchedEffect(user) {
@@ -91,10 +101,14 @@ class MainActivity : ComponentActivity() {
             ) {
                 Scaffold(
                     topBar = {
-                        TopBar(onMenuClick = { drawerOpen = !drawerOpen })
+                        if (!isAuthScreen) {
+                            TopBar(onMenuClick = { drawerOpen = !drawerOpen })
+                        }
                     },
                     bottomBar = {
-                        BottomNavigationBar(navController)
+                        if (!isAuthScreen) {
+                            BottomNavigationBar(navController)
+                        }
                     }
                 ) { innerPadding ->
                     Box(modifier = Modifier.padding(innerPadding)) {
@@ -140,5 +154,6 @@ class MainActivity : ComponentActivity() {
         val wic = WindowInsetsControllerCompat(window, window.decorView)
         wic.isAppearanceLightStatusBars = true
         wic.isAppearanceLightNavigationBars = true
+
     }
 }

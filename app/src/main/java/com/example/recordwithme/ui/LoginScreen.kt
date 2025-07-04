@@ -2,13 +2,24 @@ package com.example.recordwithme.ui
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Button
 import androidx.compose.material.ButtonDefaults
 import androidx.compose.material.OutlinedTextField
 import androidx.compose.material.Text
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -26,7 +37,11 @@ import android.widget.Toast
 import androidx.compose.ui.platform.LocalContext
 
 @Composable
-fun LoginScreen(onLoginSuccess: () -> Unit, navController: NavController) {
+fun LoginScreen(
+    onLoginSuccess: () -> Unit,
+    navController: NavController,
+    onGoogleSignIn: () -> Unit
+) {
     var id by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     val context = LocalContext.current
@@ -49,7 +64,12 @@ fun LoginScreen(onLoginSuccess: () -> Unit, navController: NavController) {
                     .height(250.dp)
                     .padding(bottom = 10.dp)
             )
-            Text("RecordWithMe", fontWeight = FontWeight.Bold, fontFamily = FontFamily.Cursive, fontSize = 30.sp)
+            Text(
+                "RecordWithMe",
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Cursive,
+                fontSize = 30.sp
+            )
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -99,6 +119,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit, navController: NavController) {
             ) {
                 Text("로그인", fontWeight = FontWeight.Bold)
             }
+
             Text(
                 text = "계정이 없으신가요? 회원가입",
                 fontWeight = FontWeight.Bold,
@@ -110,6 +131,21 @@ fun LoginScreen(onLoginSuccess: () -> Unit, navController: NavController) {
                 textAlign = TextAlign.Center
             )
 
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // 구글 로그인 버튼 추가
+            Button(
+                onClick = onGoogleSignIn,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4285F4)),
+                shape = RoundedCornerShape(20.dp)
+            ) {
+                Text(
+                    text = "Google로 로그인",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
     }
 }

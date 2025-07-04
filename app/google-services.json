@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "508904357611",
+    "project_id": "record-with-me",
+    "storage_bucket": "record-with-me.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:508904357611:android:c08a9a538a09815cd948ae",
+        "android_client_info": {
+          "package_name": "com.example.recordwithme"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "508904357611-oijal37qvfd1gmc8pkts5em86e05e54g.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD7dlAIekh7QceDSQC4EH1G_EdBfuQpn8U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "508904357611-oijal37qvfd1gmc8pkts5em86e05e54g.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

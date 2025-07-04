@@ -1,5 +1,4 @@
-package com.example.recordwithme
-
+import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
@@ -10,21 +9,24 @@ import androidx.activity.viewModels
 import androidx.compose.material.Button
 import androidx.compose.material.Text
 import androidx.compose.runtime.*
-import androidx.compose.ui.platform.LocalContext
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsControllerCompat
-import com.google.android.gms.auth.api.signin.*
+import com.example.recordwithme.AuthViewModel
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInClient
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
+import com.google.firebase.auth.ktx.auth
+import com.example.recordwithme.R
 
 class MainActivity : ComponentActivity() {
 
     private lateinit var googleSignInClient: GoogleSignInClient
     private val viewModel: AuthViewModel by viewModels()
+
     private val auth: FirebaseAuth by lazy { Firebase.auth }
 
+    // ActivityResultLauncher를 Compose와 호환되도록 등록
     private val googleSignInLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -50,22 +52,13 @@ class MainActivity : ComponentActivity() {
         googleSignInClient = GoogleSignIn.getClient(this, gso)
 
         setContent {
-            // ✅ 시스템 UI 설정 (엣지 투 엣지) — 이 시점에서 해야 안전함
-            SideEffect {
-                enableEdgeToEdge()
-            }
+            val userState = viewModel.authenticatedUser.collectAsState()
+            val user = userState.value
 
-            val user by viewModel.authenticatedUser.collectAsState()
-            val context = LocalContext.current
-            val shownToast = remember { mutableStateOf(false) }
-
-            user?.let {
-                if (!shownToast.value) {
-                    Toast.makeText(context, "로그인 성공: ${it.email}", Toast.LENGTH_SHORT).show()
-                    shownToast.value = true
-                }
-                Text(text = "환영합니다, ${it.email}")
-            } ?: run {
+            if (user != null) {
+                Toast.makeText(this, "로그인 성공: ${user.email}", Toast.LENGTH_SHORT).show()
+                Text(text = "환영합니다, ${user.email}")
+            } else {
                 Button(onClick = { signIn() }) {
                     Text(text = "Google로 로그인")
                 }
@@ -76,19 +69,5 @@ class MainActivity : ComponentActivity() {
     private fun signIn() {
         val signInIntent = googleSignInClient.signInIntent
         googleSignInLauncher.launch(signInIntent)
-    }
-
-    private fun enableEdgeToEdge() {
-        // 콘텐츠가 시스템 바 아래까지 그려지게
-        WindowCompat.setDecorFitsSystemWindows(window, false)
-
-        // 상태바/내비게이션바 투명
-        window.statusBarColor = android.graphics.Color.TRANSPARENT
-        window.navigationBarColor = android.graphics.Color.TRANSPARENT
-
-        // 상태바/내비게이션 아이콘 색상 조정 (배경 밝을 때 아이콘을 어둡게)
-        val wic = WindowInsetsControllerCompat(window, window.decorView)
-        wic.isAppearanceLightStatusBars = true
-        wic.isAppearanceLightNavigationBars = true
     }
 }

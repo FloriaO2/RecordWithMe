@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.recordwithme.R
 
@@ -42,8 +43,12 @@ fun LoginScreen(onLoginSuccess: () -> Unit, navController: NavController) {
                 contentDescription = "앱 로고",
                 modifier = Modifier
                     .height(250.dp)
-                    .padding(bottom = 50.dp)
+                    .padding(bottom = 10.dp)
             )
+            Text("RecordWithMe", fontWeight = FontWeight.Bold, fontFamily = FontFamily.Cursive, fontSize = 30.sp)
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             OutlinedTextField(
                 value = id,
                 onValueChange = { id = it },

@@ -8,8 +8,11 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.recordwithme.R
 
 @Composable
@@ -23,13 +26,25 @@ fun TopBar(onMenuClick: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                // 왼쪽 로고
-                Image(
-                    painter = painterResource(id = R.drawable.logo),
-                    contentDescription = "앱 로고",
-                    modifier = Modifier
-                        .height(40.dp)
-                )
+                // 왼쪽 로고와 텍스트
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.logo),
+                        contentDescription = "앱 로고",
+                        modifier = Modifier
+                            .height(35.dp)
+                    )
+                    
+                    Text(
+                        text = "RecordWithMe",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
+                    )
+                }
 
                 // 오른쪽 메뉴 버튼
                 IconButton(onClick = onMenuClick) {

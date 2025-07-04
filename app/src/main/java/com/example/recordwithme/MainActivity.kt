@@ -1,20 +1,47 @@
 package com.example.recordwithme
 
 import android.os.Bundle
-import androidx.activity.enableEdgeToEdge
-import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.navigation.compose.*
+import com.example.recordwithme.ui.*
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-        setContentView(R.layout.activity_main)
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
-            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
-            insets
+        setContent {
+            val navController = rememberNavController()
+            var drawerOpen by remember { mutableStateOf(false) }
+
+            DrawerContainer(
+                drawerOpen = drawerOpen,
+                onDrawerClose = { drawerOpen = false }
+            ) {
+                Scaffold(
+                    topBar = {
+                        TopBar(onMenuClick = { drawerOpen = !drawerOpen })
+                    },
+                    bottomBar = {
+                        BottomNavigationBar(navController)
+                    }
+                ) { innerPadding ->
+                    Box(modifier = Modifier.padding(innerPadding)) {
+                        NavHost(
+                            navController = navController,
+                            startDestination = "home"
+                        ) {
+                            composable("home") { HomeScreen() }
+                            composable("profile") { ProfileScreen() }
+                            composable("notification") { NotificationScreen() }
+                            composable("group") { GroupScreen() }
+                        }
+                    }
+                }
+            }
         }
     }
 }

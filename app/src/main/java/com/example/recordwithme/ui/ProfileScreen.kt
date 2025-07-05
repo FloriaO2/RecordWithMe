@@ -5,6 +5,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Group
@@ -13,6 +16,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -25,10 +29,17 @@ import kotlinx.coroutines.tasks.await
 data class Friend(val id: String, val name: String, val mutual: String) {
     val initial: String get() = name.firstOrNull()?.toString() ?: ""
 }
+
 data class User(val id: String, val name: String, val loginType: String, val displayId: String = "")
 
+// FriendItem 컴포저블 추가
 @Composable
-fun FriendItem(friend: Friend, isSelected: Boolean = false, onRemoveClick: (Friend) -> Unit) {
+fun FriendItem(
+    friend: Friend,
+    isSelected: Boolean = false,
+    groupMode: Boolean = false,
+    onRemoveClick: (Friend) -> Unit
+) {
     var showConfirmDialog by remember { mutableStateOf(false) }
 
     if (showConfirmDialog) {
@@ -79,8 +90,10 @@ fun FriendItem(friend: Friend, isSelected: Boolean = false, onRemoveClick: (Frie
             Text(friend.mutual, color = Color.Gray)
         }
 
-        IconButton(onClick = { showConfirmDialog = true }) {
-            Icon(Icons.Filled.Close, contentDescription = "Remove")
+        if (!groupMode) {
+            IconButton(onClick = { showConfirmDialog = true }) {
+                Icon(Icons.Filled.Close, contentDescription = "Remove")
+            }
         }
     }
 }
@@ -91,7 +104,8 @@ fun FriendSearchDialog(
     currentUserEmail: String?,
     firestore: FirebaseFirestore,
     onDismiss: () -> Unit,
-    onFriendAdded: (Friend) -> Unit
+    onFriendAdded: (Friend) -> Unit,
+    currentFriendIds: List<String>
 ) {
     var searchText by remember { mutableStateOf("") }
     var searchResults by remember { mutableStateOf<List<User>>(emptyList()) }
@@ -204,9 +218,13 @@ fun ProfileScreen(
     var showFriendDialog by remember { mutableStateOf(false) }
     var showGroupDialog by remember { mutableStateOf(false) }
     var friends by remember { mutableStateOf<List<Friend>>(emptyList()) }
-    var selectedFriendIds by remember { mutableStateOf(mutableSetOf<String>()) }
+    val selectedFriendIds = remember { mutableStateListOf<String>() }
     var userName by remember { mutableStateOf("") }
     var userDisplayId by remember { mutableStateOf("") }
+
+    var groupMode by remember { mutableStateOf(false) }
+    var groupName by remember { mutableStateOf("") }
+    var groupNote by remember { mutableStateOf("") }
 
     // Firestore에서 사용자 정보 불러오기
     LaunchedEffect(currentUserId) {
@@ -220,14 +238,8 @@ fun ProfileScreen(
                 userName = userDoc.getString("name") ?: ""
                 userDisplayId = userDoc.getString("id") ?: ""
             }
-        } catch (e: Exception) {
-            // 에러 처리
-        }
+        } catch (_: Exception) {}
     }
-
-    var groupMode by remember { mutableStateOf(false) }
-    var groupName by remember { mutableStateOf("") }
-    var groupNote by remember { mutableStateOf("") }
 
     LaunchedEffect(currentUserId) {
         val snapshot = firestore.collection("users")
@@ -242,118 +254,151 @@ fun ProfileScreen(
         }
     }
 
+    // LazyColumn 상태 기억
+    val listState = rememberLazyListState()
+
+    // 스크롤에 따라 프로필 영역 투명도 조절 (0f ~ 1f)
+    val profileAlpha by remember {
+        derivedStateOf {
+            val maxOffset = 300f
+            val offset = listState.firstVisibleItemScrollOffset.toFloat()
+            ((maxOffset - offset) / maxOffset).coerceIn(0f, 1f)
+        }
+    }
+
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("Profile", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(25.dp))
-
-        Box(
-            modifier = Modifier
-                .size(140.dp)
-                .clip(CircleShape)
-                .background(Color(0xFFE0E0E0)),
-            contentAlignment = Alignment.Center
-        ) {
-            val displayText = when {
-                userName.isNotEmpty() -> userName.first().uppercaseChar().toString()
-                userDisplayId.isNotEmpty() -> userDisplayId.first().uppercaseChar().toString()
-                currentUserEmail?.isNotEmpty() == true -> currentUserEmail.first().uppercaseChar().toString()
-                else -> "U"
-            }
-
-            Text(
-                text = displayText,
-                fontSize = 48.sp,
-                color = Color.White,
-                fontWeight = FontWeight.Bold
-            )
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        val displayName = when {
-            userName.isNotEmpty() -> userName
-            userDisplayId.isNotEmpty() -> userDisplayId
-            currentUserEmail?.isNotEmpty() == true -> currentUserEmail
-            else -> currentUserId
-        }
-
-        Text(displayName, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-        if (userDisplayId.isNotEmpty()) {
-            Text("@$userDisplayId", fontSize = 16.sp, color = Color.Gray)
-        }
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Button(
-            onClick = { },
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF0F0F0)),
-            shape = RoundedCornerShape(24.dp),
-            modifier = Modifier.width(350.dp)
-        ) {
-            Text("Edit Profile", color = Color.Black)
-        }
-
-        Spacer(modifier = Modifier.height(28.dp))
-        Row(
+        // 프로필 영역 (스크롤 내리면 서서히 사라짐)
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 40.dp, bottom = 12.dp, end = 24.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+                .alpha(profileAlpha)
+                .padding(vertical = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("Friends", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text("Profile", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(25.dp))
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    onClick = { showFriendDialog = true },
-                    modifier = Modifier.width(90.dp).height(60.dp),
-                    shape = RoundedCornerShape(10),
-                    border = BorderStroke(2.dp, Color.Gray),
-                    colors = ButtonDefaults.outlinedButtonColors(),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Text("+", fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Icon(Icons.Filled.Person, contentDescription = "Add Friend", modifier = Modifier.size(32.dp))
-                    }
+            Box(
+                modifier = Modifier
+                    .size(140.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFE0E0E0)),
+                contentAlignment = Alignment.Center
+            ) {
+                val displayText = when {
+                    userName.isNotEmpty() -> userName.first().uppercaseChar().toString()
+                    userDisplayId.isNotEmpty() -> userDisplayId.first().uppercaseChar().toString()
+                    currentUserEmail?.isNotEmpty() == true -> currentUserEmail.first().uppercaseChar().toString()
+                    else -> "U"
                 }
 
-                Button(
-                    onClick = {
-                        if (groupMode && selectedFriendIds.isNotEmpty()) {
-                            showGroupDialog = true
-                        } else {
-                            groupMode = !groupMode
-                            selectedFriendIds.clear()
-                        }
-                    },
-                    modifier = Modifier.width(90.dp).height(60.dp),
-                    shape = RoundedCornerShape(10),
-                    border = BorderStroke(2.dp, Color.Gray),
-                    colors = ButtonDefaults.outlinedButtonColors(),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
+                Text(
+                    text = displayText,
+                    fontSize = 48.sp,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+            val displayName = when {
+                userName.isNotEmpty() -> userName
+                userDisplayId.isNotEmpty() -> userDisplayId
+                currentUserEmail?.isNotEmpty() == true -> currentUserEmail
+                else -> currentUserId
+            }
+            Text(displayName, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            if (userDisplayId.isNotEmpty()) {
+                Text("@$userDisplayId", fontSize = 16.sp, color = Color.Gray)
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(
+                onClick = {},
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF0F0F0)),
+                shape = RoundedCornerShape(24.dp),
+                modifier = Modifier.width(350.dp)
+            ) {
+                Text("Edit Profile", color = Color.Black)
+            }
+
+            Spacer(modifier = Modifier.height(28.dp))
+        }
+
+        // sticky 효과를 위해 Box 로 감싸서 고정영역 따로 만들기
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color.White)
+                .height(80.dp)
+                .padding(horizontal = 40.dp, vertical = 12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxSize(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("Friends", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = { showFriendDialog = true },
+                        modifier = Modifier.width(90.dp).height(60.dp),
+                        shape = RoundedCornerShape(10),
+                        border = BorderStroke(2.dp, Color.Gray),
+                        colors = ButtonDefaults.outlinedButtonColors(),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
                     ) {
-                        Text("+", fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Icon(Icons.Filled.Group, contentDescription = "Add Group", modifier = Modifier.size(34.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("+", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Icon(
+                                Icons.Filled.Person,
+                                contentDescription = "Add Friend",
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
+                    }
+
+                    Button(
+                        onClick = {
+                            groupMode = !groupMode
+                            if (!groupMode) selectedFriendIds.clear()
+                        },
+                        modifier = Modifier.width(90.dp).height(60.dp),
+                        shape = RoundedCornerShape(10),
+                        border = BorderStroke(2.dp, Color.Gray),
+                        colors = ButtonDefaults.outlinedButtonColors(),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("+", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Icon(
+                                Icons.Filled.Group,
+                                contentDescription = "Add Group",
+                                modifier = Modifier.size(34.dp)
+                            )
+                        }
                     }
                 }
             }
         }
 
-        // Friends 리스트
-        Column(modifier = Modifier.padding(horizontal = 24.dp)) {
-            friends.forEach { friend ->
+        // 친구 목록만 LazyColumn으로 스크롤 가능하게
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .padding(bottom = 80.dp),
+            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            items(friends) { friend ->
                 val isSelected = friend.id in selectedFriendIds
 
                 Row(
@@ -378,6 +423,7 @@ fun ProfileScreen(
                     FriendItem(
                         friend = friend,
                         isSelected = isSelected,
+                        groupMode = groupMode,
                         onRemoveClick = { toRemove ->
                             firestore.collection("users").document(currentUserId)
                                 .collection("friends").document(toRemove.id).delete()
@@ -386,7 +432,31 @@ fun ProfileScreen(
                         }
                     )
                 }
-                Spacer(modifier = Modifier.height(12.dp))
+            }
+        }
+
+        // 그룹 추가 버튼: 흰 영역 없이 버튼만 띄우기
+        if (groupMode && selectedFriendIds.isNotEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 24.dp),
+                contentAlignment = Alignment.BottomCenter
+            ) {
+                Button(
+                    onClick = { showGroupDialog = true },
+                    modifier = Modifier
+                        .wrapContentWidth()
+                        .height(48.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF90CAF9),
+                        contentColor = Color.White
+                    ),
+                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 10.dp)
+                ) {
+                    Text("그룹 추가하기", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                }
             }
         }
     }
@@ -412,54 +482,32 @@ fun ProfileScreen(
             },
             confirmButton = {
                 TextButton(onClick = {
-                    if (groupName.isBlank()) {
-                        // 그룹 이름 필수 체크
-                        return@TextButton
-                    }
+                    if (groupName.isBlank()) return@TextButton
                     val groupMembers = selectedFriendIds + currentUserId
-                    val groupId = groupName.trim() // 그룹 이름을 ID로 사용 (공백 제거)
+                    val groupId = groupName.trim()
                     val groupData = mapOf(
                         "name" to groupName,
                         "note" to groupNote,
                         "members" to groupMembers.toList(),
                         "creator" to currentUserId
                     )
-                    firestore.collection("groups")
-                        .document(groupId)
-                        .set(groupData)
-                        .addOnSuccessListener {
-                            // 멤버별 groups 컬렉션에도 저장
-                            groupMembers.forEach { memberId ->
-                                val memberGroupData = mapOf(
-                                    "groupId" to groupId,
-                                    "name" to groupName,
-                                    "note" to groupNote,
-                                    "creator" to currentUserId,
-                                    "members" to groupMembers.toList()
-                                )
-                                firestore.collection("users")
-                                    .document(memberId)
-                                    .collection("groups")
-                                    .document(groupId)
-                                    .set(memberGroupData)
-                            }
-                            // 저장 후 상태 초기화 및 다이얼로그 닫기
-                            groupName = ""
-                            groupNote = ""
-                            selectedFriendIds.clear()
-                            groupMode = false
-                            showGroupDialog = false
+                    firestore.collection("groups").document(groupId).set(groupData).addOnSuccessListener {
+                        groupMembers.forEach { memberId ->
+                            val memberGroupData = groupData + ("groupId" to groupId)
+                            firestore.collection("users").document(memberId).collection("groups").document(groupId).set(memberGroupData)
                         }
-                        .addOnFailureListener { e ->
-                            // 실패 처리(원한다면)
-                        }
+                        groupName = ""
+                        groupNote = ""
+                        selectedFriendIds.clear()
+                        groupMode = false
+                        showGroupDialog = false
+                    }
                 }) {
                     Text("완료")
                 }
             },
             dismissButton = {
                 TextButton(onClick = {
-                    // 다이얼로그 닫을 때 상태 초기화도 가능
                     groupName = ""
                     groupNote = ""
                     showGroupDialog = false
@@ -476,9 +524,8 @@ fun ProfileScreen(
             currentUserEmail = currentUserEmail,
             firestore = firestore,
             onDismiss = { showFriendDialog = false },
-            onFriendAdded = { newFriend ->
-                friends = friends + newFriend
-            }
+            onFriendAdded = { newFriend -> friends = friends + newFriend },
+            currentFriendIds = friends.map { it.id }
         )
     }
 }

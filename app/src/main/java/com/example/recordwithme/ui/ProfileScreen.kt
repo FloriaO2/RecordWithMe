@@ -238,6 +238,11 @@ fun FriendSearchDialog(
                                                         .push()
                                                         .setValue(requestData)
 
+                                                    android.widget.Toast.makeText(
+                                                        context,
+                                                        "친구 요청을 보냈습니다",
+                                                        android.widget.Toast.LENGTH_SHORT
+                                                    ).show()
                                                     onDismiss()
                                                 }
                                                 .addOnFailureListener { e ->

@@ -16,6 +16,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 
 @Composable
@@ -26,6 +27,8 @@ fun SignUpScreen(navController: NavController) {
     var id by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordCheck by remember { mutableStateOf("") }
+    val auth = FirebaseAuth.getInstance()
+    val db = FirebaseFirestore.getInstance()
 
     Box(
         modifier = Modifier.fillMaxSize(),
@@ -135,37 +138,44 @@ fun SignUpScreen(navController: NavController) {
                                 Toast.makeText(context, "비밀번호를 모두 입력하세요.", Toast.LENGTH_SHORT).show()
                             } else if (password != passwordCheck) {
                                 Toast.makeText(context, "비밀번호가 일치하지 않습니다.", Toast.LENGTH_SHORT).show()
+                            } else if (password.length < 6) {
+                                Toast.makeText(context, "비밀번호는 6자 이상이어야 합니다.", Toast.LENGTH_SHORT).show()
                             } else {
-                                // 1. Firestore에서 아이디(문서ID) 중복 체크
-                                FirebaseFirestore.getInstance()
-                                    .collection("users")
-                                    .document(id)
-                                    .get()
-                                    .addOnSuccessListener { document ->
-                                        if (document.exists()) {
-                                            Toast.makeText(context, "이미 사용 중인 아이디입니다.", Toast.LENGTH_SHORT).show()
-                                        } else {
-                                            // 2. 중복이 아니면 회원가입 진행
+                                // 아이디를 페이크 이메일로 변환
+                                val fakeEmail = "$id@recordwith.me"
+                                
+                                // Firebase Authentication을 사용한 회원가입
+                                auth.createUserWithEmailAndPassword(fakeEmail, password)
+                                    .addOnCompleteListener { task ->
+                                        if (task.isSuccessful) {
+                                            // 회원가입 성공 시 Firestore에 사용자 정보 저장
+                                            val user = auth.currentUser
                                             val userInfo = hashMapOf(
                                                 "name" to name,
                                                 "id" to id,
-                                                "password" to password
+                                                "email" to fakeEmail,
+                                                "uid" to user?.uid
                                             )
-                                            FirebaseFirestore.getInstance()
-                                                .collection("users")
-                                                .document(id)
+                                            
+                                            db.collection("users")
+                                                .document(user?.uid ?: "")
                                                 .set(userInfo)
                                                 .addOnSuccessListener {
                                                     Toast.makeText(context, "회원가입 완료!", Toast.LENGTH_SHORT).show()
                                                     navController.popBackStack("login", inclusive = false)
                                                 }
                                                 .addOnFailureListener {
-                                                    Toast.makeText(context, "회원정보 저장 실패", Toast.LENGTH_SHORT).show()
+                                                    Toast.makeText(context, "사용자 정보 저장 실패", Toast.LENGTH_SHORT).show()
                                                 }
+                                        } else {
+                                            val errorMessage = when (task.exception) {
+                                                is com.google.firebase.auth.FirebaseAuthWeakPasswordException -> "비밀번호가 너무 약합니다."
+                                                is com.google.firebase.auth.FirebaseAuthInvalidCredentialsException -> "올바르지 않은 아이디 형식입니다."
+                                                is com.google.firebase.auth.FirebaseAuthUserCollisionException -> "이미 사용 중인 아이디입니다."
+                                                else -> "회원가입 실패: ${task.exception?.message}"
+                                            }
+                                            Toast.makeText(context, errorMessage, Toast.LENGTH_SHORT).show()
                                         }
-                                    }
-                                    .addOnFailureListener {
-                                        Toast.makeText(context, "네트워크 오류: ${it.message}", Toast.LENGTH_SHORT).show()
                                     }
                             }
                         },

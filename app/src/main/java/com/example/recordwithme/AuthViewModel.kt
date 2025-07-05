@@ -15,7 +15,7 @@ class AuthViewModel : ViewModel() {
     private val auth: FirebaseAuth = FirebaseAuth.getInstance()
 
     // 사용자 인증 상태를 관찰할 수 있는 StateFlow
-    private val _authenticatedUser = MutableStateFlow<FirebaseUser?>(null)
+    private val _authenticatedUser = MutableStateFlow<FirebaseUser?>(auth.currentUser)
     val authenticatedUser: StateFlow<FirebaseUser?> get() = _authenticatedUser
 
     // Google 로그인 후 받은 ID Token으로 Firebase 인증
@@ -42,5 +42,11 @@ class AuthViewModel : ViewModel() {
     // 로그인 실패 또는 로그아웃 시 호출
     fun setUser(user: FirebaseUser?) {
         _authenticatedUser.value = user
+    }
+
+    // 로그아웃
+    fun signOut() {
+        auth.signOut()
+        _authenticatedUser.value = null
     }
 }

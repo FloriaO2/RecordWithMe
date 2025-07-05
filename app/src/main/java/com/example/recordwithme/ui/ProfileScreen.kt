@@ -50,7 +50,7 @@ import kotlinx.coroutines.tasks.await
 data class Friend(val id: String, val name: String, val mutual: String) {
     val initial: String get() = name.firstOrNull()?.toString() ?: ""
 }
-data class User(val id: String, val name: String, val loginType: String)
+data class User(val id: String, val name: String, val loginType: String, val displayId: String = "")
 
 // --- 친구 아이템 ---
 @Composable
@@ -136,11 +136,14 @@ fun FriendSearchDialog(
 
                 searchResults = querySnapshot.documents.mapNotNull { doc ->
                     val id = doc.id
-                    val email = doc.getString("email")
-                    val loginType = if (email != null) "google" else "normal"
-                    val displayName = email ?: id
-                    if (displayName.contains(searchText, ignoreCase = true) && id != currentUserId) {
-                        User(id, displayName, loginType)
+                    val userId = doc.getString("id")
+                    val name = doc.getString("name")
+                    val loginType = if (userId != null) "normal" else "google"
+                    val displayName = name ?: userId ?: id
+                    val displayId = userId ?: ""
+                    
+                    if ((displayName.contains(searchText, ignoreCase = true) || displayId.contains(searchText, ignoreCase = true)) && id != currentUserId) {
+                        User(id, displayName, loginType, displayId)
                     } else null
                 }
             } catch (e: Exception) {
@@ -158,7 +161,7 @@ fun FriendSearchDialog(
                 OutlinedTextField(
                     value = searchText,
                     onValueChange = { searchText = it },
-                    label = { Text("이메일 또는 ID로 검색") },
+                    label = { Text("이름 또는 아이디로 검색") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -180,7 +183,12 @@ fun FriendSearchDialog(
                                         .padding(vertical = 8.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(user.name, modifier = Modifier.weight(1f))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(user.name, fontWeight = FontWeight.Medium)
+                                        if (user.id.isNotEmpty()) {
+                                            Text("@${user.id}", fontSize = 12.sp, color = Color.Gray)
+                                        }
+                                    }
                                     Button(
                                         onClick = {
                                             val friendData = mapOf("name" to user.name)
@@ -226,6 +234,25 @@ fun ProfileScreen(
 
     var showFriendDialog by remember { mutableStateOf(false) }
     var friends by remember { mutableStateOf<List<Friend>>(emptyList()) }
+    var userName by remember { mutableStateOf("") }
+    var userDisplayId by remember { mutableStateOf("") }
+
+    // Firestore에서 사용자 정보 불러오기
+    LaunchedEffect(currentUserId) {
+        try {
+            val userDoc = firestore.collection("users")
+                .document(currentUserId)
+                .get()
+                .await()
+            
+            if (userDoc.exists()) {
+                userName = userDoc.getString("name") ?: ""
+                userDisplayId = userDoc.getString("id") ?: ""
+            }
+        } catch (e: Exception) {
+            // 에러 처리
+        }
+    }
 
     // Firestore에서 친구 목록 불러오기
     LaunchedEffect(currentUserId) {
@@ -257,8 +284,15 @@ fun ProfileScreen(
                 .background(Color(0xFFE0E0E0)),
             contentAlignment = Alignment.Center
         ) {
+            val displayText = when {
+                userName.isNotEmpty() -> userName.first().uppercaseChar().toString()
+                userDisplayId.isNotEmpty() -> userDisplayId.first().uppercaseChar().toString()
+                currentUserEmail?.isNotEmpty() == true -> currentUserEmail.first().uppercaseChar().toString()
+                else -> "U"
+            }
+            
             Text(
-                text = (currentUserEmail ?: currentUserId).first().uppercaseChar().toString(),
+                text = displayText,
                 fontSize = 48.sp,
                 color = Color.White,
                 fontWeight = FontWeight.Bold
@@ -266,7 +300,18 @@ fun ProfileScreen(
         }
 
         Spacer(modifier = Modifier.height(12.dp))
-        Text(currentUserEmail ?: currentUserId, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        
+        val displayName = when {
+            userName.isNotEmpty() -> userName
+            userDisplayId.isNotEmpty() -> userDisplayId
+            currentUserEmail?.isNotEmpty() == true -> currentUserEmail
+            else -> currentUserId
+        }
+        
+        Text(displayName, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        if (userDisplayId.isNotEmpty()) {
+            Text("@$userDisplayId", fontSize = 16.sp, color = Color.Gray)
+        }
         Spacer(modifier = Modifier.height(16.dp))
 
         Button(

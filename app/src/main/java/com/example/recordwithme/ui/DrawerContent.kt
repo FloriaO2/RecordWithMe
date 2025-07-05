@@ -11,9 +11,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.recordwithme.AuthViewModel
 
 @Composable
-fun AppDrawer() {
+fun AppDrawer(
+    onDrawerClose: () -> Unit = {},
+    authViewModel: AuthViewModel? = null
+) {
     val context = LocalContext.current
 
     Column(modifier = Modifier.padding(16.dp)) {
@@ -84,7 +88,12 @@ fun AppDrawer() {
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable { 
-                    Toast.makeText(context, "로그아웃 클릭", Toast.LENGTH_SHORT).show()
+                    authViewModel?.signOut() ?: run {
+                        // AuthViewModel이 없는 경우 직접 Firebase Auth 사용
+                        com.google.firebase.auth.FirebaseAuth.getInstance().signOut()
+                    }
+                    Toast.makeText(context, "로그아웃되었습니다.", Toast.LENGTH_SHORT).show()
+                    onDrawerClose()
                 }
                 .padding(vertical = 8.dp)
         )

@@ -39,8 +39,8 @@ import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.ktx.auth
-import com.google.firebase.ktx.Firebase
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.ktx.Firebase
 
 class MainActivity : ComponentActivity() {
     private lateinit var googleSignInClient: GoogleSignInClient
@@ -183,4 +183,6 @@ class MainActivity : ComponentActivity() {
         wic.isAppearanceLightStatusBars = true
         wic.isAppearanceLightNavigationBars = true
     }
+
+
 }

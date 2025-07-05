@@ -28,7 +28,7 @@ data class Friend(val id: String, val name: String, val mutual: String) {
 data class User(val id: String, val name: String, val loginType: String, val displayId: String = "")
 
 @Composable
-fun FriendItem(friend: Friend, isSelected: Boolean = false, onRemoveClick: (Friend) -> Unit) {
+fun FriendItem(friend: Friend, onRemoveClick: (Friend) -> Unit) {
     var showConfirmDialog by remember { mutableStateOf(false) }
 
     if (showConfirmDialog) {
@@ -91,11 +91,13 @@ fun FriendSearchDialog(
     currentUserEmail: String?,
     firestore: FirebaseFirestore,
     onDismiss: () -> Unit,
-    onFriendAdded: (Friend) -> Unit
+    onFriendAdded: (Friend) -> Unit,
+    existingFriends: List<Friend> = emptyList()
 ) {
     var searchText by remember { mutableStateOf("") }
     var searchResults by remember { mutableStateOf<List<User>>(emptyList()) }
     var loading by remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     LaunchedEffect(searchText) {
         if (searchText.isBlank()) {
@@ -112,7 +114,9 @@ fun FriendSearchDialog(
                     val displayName = name ?: userId ?: id
                     val displayId = userId ?: ""
 
-                    if ((displayName.contains(searchText, ignoreCase = true) || displayId.contains(searchText, ignoreCase = true)) && id != currentUserId) {
+                    if ((displayName.contains(searchText, ignoreCase = true) || displayId.contains(searchText, ignoreCase = true)) && 
+                        id != currentUserId && 
+                        !existingFriends.any { it.id == id }) {
                         User(id, displayName, loginType, displayId)
                     } else null
                 }
@@ -143,7 +147,11 @@ fun FriendSearchDialog(
                     }
                 } else {
                     if (searchResults.isEmpty()) {
-                        Text("검색 결과 없음", color = Color.Gray)
+                        if (searchText.isNotBlank()) {
+                            Text("검색 결과 없음", color = Color.Gray)
+                        } else {
+                            Text("검색어를 입력하세요", color = Color.Gray)
+                        }
                     } else {
                         Column {
                             searchResults.forEach { user ->
@@ -155,12 +163,21 @@ fun FriendSearchDialog(
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(user.name, fontWeight = FontWeight.Medium)
-                                        if (user.id.isNotEmpty()) {
-                                            Text("@${user.id}", fontSize = 12.sp, color = Color.Gray)
+                                        if (user.displayId.isNotEmpty()) {
+                                            Text("@${user.displayId}", fontSize = 12.sp, color = Color.Gray)
                                         }
                                     }
                                     Button(
                                         onClick = {
+                                            if (existingFriends.any { it.id == user.id }) {
+                                                android.widget.Toast.makeText(
+                                                    context, 
+                                                    "이미 친구로 등록된 사용자입니다.", 
+                                                    android.widget.Toast.LENGTH_SHORT
+                                                ).show()
+                                                return@Button
+                                            }
+                                            
                                             val friendData = mapOf("name" to user.name)
                                             firestore.collection("users")
                                                 .document(currentUserId)
@@ -168,8 +185,20 @@ fun FriendSearchDialog(
                                                 .document(user.id)
                                                 .set(friendData)
                                                 .addOnSuccessListener {
+                                                    android.widget.Toast.makeText(
+                                                        context, 
+                                                        "${user.name}님이 친구로 추가되었습니다.", 
+                                                        android.widget.Toast.LENGTH_SHORT
+                                                    ).show()
                                                     onFriendAdded(Friend(user.id, user.name, "새 친구"))
                                                     onDismiss()
+                                                }
+                                                .addOnFailureListener { e ->
+                                                    android.widget.Toast.makeText(
+                                                        context, 
+                                                        "친구 추가에 실패했습니다: ${e.message}", 
+                                                        android.widget.Toast.LENGTH_SHORT
+                                                    ).show()
                                                 }
                                         },
                                         shape = RoundedCornerShape(12.dp),
@@ -207,10 +236,14 @@ fun ProfileScreen(
     var selectedFriendIds by remember { mutableStateOf(mutableSetOf<String>()) }
     var userName by remember { mutableStateOf("") }
     var userDisplayId by remember { mutableStateOf("") }
+    var groupMode by remember { mutableStateOf(false) }
+    var groupName by remember { mutableStateOf("") }
+    var groupNote by remember { mutableStateOf("") }
 
-    // Firestore에서 사용자 정보 불러오기
+    // Firestore에서 사용자 정보와 친구 목록을 한 번에 불러오기
     LaunchedEffect(currentUserId) {
         try {
+            // 사용자 정보 불러오기
             val userDoc = firestore.collection("users")
                 .document(currentUserId)
                 .get()
@@ -220,25 +253,21 @@ fun ProfileScreen(
                 userName = userDoc.getString("name") ?: ""
                 userDisplayId = userDoc.getString("id") ?: ""
             }
+
+            // 친구 목록 불러오기
+            val snapshot = firestore.collection("users")
+                .document(currentUserId)
+                .collection("friends")
+                .get()
+                .await()
+            
+            friends = snapshot.documents.mapNotNull { doc ->
+                val id = doc.id
+                val name = doc.getString("name") ?: return@mapNotNull null
+                Friend(id, name, "친구")
+            }
         } catch (e: Exception) {
             // 에러 처리
-        }
-    }
-
-    var groupMode by remember { mutableStateOf(false) }
-    var groupName by remember { mutableStateOf("") }
-    var groupNote by remember { mutableStateOf("") }
-
-    LaunchedEffect(currentUserId) {
-        val snapshot = firestore.collection("users")
-            .document(currentUserId)
-            .collection("friends")
-            .get()
-            .await()
-        friends = snapshot.documents.mapNotNull { doc ->
-            val id = doc.id
-            val name = doc.getString("name") ?: return@mapNotNull null
-            Friend(id, name, "친구")
         }
     }
 
@@ -246,8 +275,9 @@ fun ProfileScreen(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        Spacer(modifier = Modifier.height(13.dp))
         Text("Profile", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(25.dp))
+        Spacer(modifier = Modifier.height(17.dp))
 
         Box(
             modifier = Modifier
@@ -377,7 +407,6 @@ fun ProfileScreen(
 
                     FriendItem(
                         friend = friend,
-                        isSelected = isSelected,
                         onRemoveClick = { toRemove ->
                             firestore.collection("users").document(currentUserId)
                                 .collection("friends").document(toRemove.id).delete()
@@ -413,17 +442,18 @@ fun ProfileScreen(
             confirmButton = {
                 TextButton(onClick = {
                     if (groupName.isBlank()) {
-                        // 그룹 이름 필수 체크
                         return@TextButton
                     }
+                    
                     val groupMembers = selectedFriendIds + currentUserId
-                    val groupId = groupName.trim() // 그룹 이름을 ID로 사용 (공백 제거)
+                    val groupId = groupName.trim()
                     val groupData = mapOf(
                         "name" to groupName,
                         "note" to groupNote,
                         "members" to groupMembers.toList(),
                         "creator" to currentUserId
                     )
+                    
                     firestore.collection("groups")
                         .document(groupId)
                         .set(groupData)
@@ -443,7 +473,8 @@ fun ProfileScreen(
                                     .document(groupId)
                                     .set(memberGroupData)
                             }
-                            // 저장 후 상태 초기화 및 다이얼로그 닫기
+                            
+                            // 상태 초기화
                             groupName = ""
                             groupNote = ""
                             selectedFriendIds.clear()
@@ -451,7 +482,7 @@ fun ProfileScreen(
                             showGroupDialog = false
                         }
                         .addOnFailureListener { e ->
-                            // 실패 처리(원한다면)
+                            // 실패 처리
                         }
                 }) {
                     Text("완료")
@@ -459,7 +490,6 @@ fun ProfileScreen(
             },
             dismissButton = {
                 TextButton(onClick = {
-                    // 다이얼로그 닫을 때 상태 초기화도 가능
                     groupName = ""
                     groupNote = ""
                     showGroupDialog = false
@@ -478,7 +508,8 @@ fun ProfileScreen(
             onDismiss = { showFriendDialog = false },
             onFriendAdded = { newFriend ->
                 friends = friends + newFriend
-            }
+            },
+            existingFriends = friends
         )
     }
 }

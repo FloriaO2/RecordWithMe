@@ -24,7 +24,7 @@ fun BottomNavigationBar(navController: NavController) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    BottomNavigation(backgroundColor = Color.White) {
+    BottomNavigation(backgroundColor = Color(0xFFFFF3E0)) {
         items.forEach { item ->
             BottomNavigationItem(
                 selected = currentRoute == item.route,
@@ -37,7 +37,14 @@ fun BottomNavigationBar(navController: NavController) {
                         }
                     }
                 },
-                icon = { Icon(imageVector = item.icon, contentDescription = item.label, modifier = Modifier.size(29.dp)) },
+                icon = {
+                    Icon(
+                        imageVector = item.icon,
+                        contentDescription = item.label,
+                        modifier = Modifier.size(29.dp),
+                        tint = if (currentRoute == item.route) Color(0xFF6D4C41) else Color(0xFFBCAAA4)
+                    )
+                },
             )
         }
     }

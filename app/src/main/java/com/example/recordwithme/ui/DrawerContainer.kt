@@ -10,11 +10,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.example.recordwithme.AuthViewModel
 
 @Composable
 fun DrawerContainer(
     drawerOpen: Boolean,
     onDrawerClose: () -> Unit,
+    authViewModel: AuthViewModel? = null,
     content: @Composable () -> Unit
 ) {
     Box {
@@ -53,7 +55,7 @@ fun DrawerContainer(
                         .align(Alignment.TopEnd)
                         .background(Color.White)
                 ) {
-                    AppDrawer()
+                    AppDrawer(onDrawerClose = onDrawerClose, authViewModel = authViewModel)
                 }
             }
         }

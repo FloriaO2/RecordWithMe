@@ -37,18 +37,15 @@ import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
-import com.google.firebase.auth.FirebaseAuth
-
-
+import com.google.firebase.firestore.FirebaseFirestore
 
 class MainActivity : ComponentActivity() {
     private lateinit var googleSignInClient: GoogleSignInClient
     private val viewModel: AuthViewModel by viewModels()
     private val auth: FirebaseAuth by lazy { Firebase.auth }
-
-
 
     private val googleSignInLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -74,6 +71,12 @@ class MainActivity : ComponentActivity() {
             .build()
         googleSignInClient = GoogleSignIn.getClient(this, gso)
 
+        // Firebase Auth 상태 리스너 설정
+        auth.addAuthStateListener { firebaseAuth ->
+            val user = firebaseAuth.currentUser
+            viewModel.setUser(user)
+        }
+
         // 시스템 UI 설정
         enableEdgeToEdge()
 
@@ -86,18 +89,43 @@ class MainActivity : ComponentActivity() {
             val currentRoute = currentBackStackEntry?.destination?.route
             val isAuthScreen = currentRoute == "login" || currentRoute == "signup"
 
-
-
             // 로그인 시 토스트 메시지 표시
+            LaunchedEffect(user?.uid) {
+                user?.let { firebaseUser ->
+                    // Firestore에서 사용자 이름 가져오기
+                    val db = FirebaseFirestore.getInstance()
+                    db.collection("users")
+                        .document(firebaseUser.uid)
+                        .get()
+                        .addOnSuccessListener { document ->
+                            if (document.exists()) {
+                                val userName = document.getString("name") ?: ""
+                                val userId = document.getString("id") ?: ""
+                                val displayName = if (userName.isNotEmpty()) userName else if (userId.isNotEmpty()) "@$userId" else firebaseUser.email ?: "사용자"
+                                Toast.makeText(context, "로그인 성공: $displayName", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "로그인 성공: ${firebaseUser.email}", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                        .addOnFailureListener {
+                            Toast.makeText(context, "로그인 성공: ${firebaseUser.email}", Toast.LENGTH_SHORT).show()
+                        }
+                }
+            }
+
+            // 로그아웃 시 화면 전환
             LaunchedEffect(user) {
-                user?.let {
-                    Toast.makeText(context, "로그인 성공: ${it.email}", Toast.LENGTH_SHORT).show()
+                if (user == null && currentRoute != "login") {
+                    navController.navigate("login") {
+                        popUpTo(0) { inclusive = true }
+                    }
                 }
             }
 
             DrawerContainer(
                 drawerOpen = drawerOpen,
-                onDrawerClose = { drawerOpen = false }
+                onDrawerClose = { drawerOpen = false },
+                authViewModel = viewModel
             ) {
                 Scaffold(
                     topBar = {
@@ -154,6 +182,5 @@ class MainActivity : ComponentActivity() {
         val wic = WindowInsetsControllerCompat(window, window.decorView)
         wic.isAppearanceLightStatusBars = true
         wic.isAppearanceLightNavigationBars = true
-
     }
 }

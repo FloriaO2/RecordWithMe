@@ -34,7 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.recordwithme.R
-import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.auth.FirebaseAuth
 
 @Composable
 fun LoginScreen(
@@ -45,6 +45,7 @@ fun LoginScreen(
     var id by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     val context = LocalContext.current
+    val auth = FirebaseAuth.getInstance()
 
     Box(
         modifier = Modifier.fillMaxSize()
@@ -76,7 +77,7 @@ fun LoginScreen(
             OutlinedTextField(
                 value = id,
                 onValueChange = { id = it },
-                label = { Text("계정") },
+                label = { Text("아이디") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp)
             )
@@ -96,25 +97,24 @@ fun LoginScreen(
                         Toast.makeText(context, "아이디와 비밀번호를 모두 입력하세요.", Toast.LENGTH_SHORT).show()
                         return@Button
                     }
-                    FirebaseFirestore.getInstance()
-                        .collection("users")
-                        .document(id)
-                        .get()
-                        .addOnSuccessListener { document ->
-                            if (document.exists()) {
-                                val savedPassword = document.getString("password")
-                                if (savedPassword == password) {
-                                    Toast.makeText(context, "로그인 성공!", Toast.LENGTH_SHORT).show()
-                                    onLoginSuccess()
-                                } else {
-                                    Toast.makeText(context, "비밀번호가 일치하지 않습니다.", Toast.LENGTH_SHORT).show()
-                                }
+                    
+                    // 아이디를 페이크 이메일로 변환
+                    val fakeEmail = "$id@recordwith.me"
+                    
+                    // Firebase Authentication을 사용한 로그인
+                    auth.signInWithEmailAndPassword(fakeEmail, password)
+                        .addOnCompleteListener { task ->
+                            if (task.isSuccessful) {
+                                Toast.makeText(context, "로그인 성공!", Toast.LENGTH_SHORT).show()
+                                onLoginSuccess()
                             } else {
-                                Toast.makeText(context, "존재하지 않는 아이디입니다.", Toast.LENGTH_SHORT).show()
+                                val errorMessage = when (task.exception) {
+                                    is com.google.firebase.auth.FirebaseAuthInvalidUserException -> "존재하지 않는 아이디입니다."
+                                    is com.google.firebase.auth.FirebaseAuthInvalidCredentialsException -> "비밀번호가 일치하지 않습니다."
+                                    else -> "로그인 실패: ${task.exception?.message}"
+                                }
+                                Toast.makeText(context, errorMessage, Toast.LENGTH_SHORT).show()
                             }
-                        }
-                        .addOnFailureListener {
-                            Toast.makeText(context, "네트워크 오류: ${it.message}", Toast.LENGTH_SHORT).show()
                         }
                 },
                 modifier = Modifier.fillMaxWidth(),

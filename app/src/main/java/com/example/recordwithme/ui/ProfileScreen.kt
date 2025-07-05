@@ -205,6 +205,25 @@ fun ProfileScreen(
     var showGroupDialog by remember { mutableStateOf(false) }
     var friends by remember { mutableStateOf<List<Friend>>(emptyList()) }
     var selectedFriendIds by remember { mutableStateOf(mutableSetOf<String>()) }
+    var userName by remember { mutableStateOf("") }
+    var userDisplayId by remember { mutableStateOf("") }
+
+    // Firestore에서 사용자 정보 불러오기
+    LaunchedEffect(currentUserId) {
+        try {
+            val userDoc = firestore.collection("users")
+                .document(currentUserId)
+                .get()
+                .await()
+
+            if (userDoc.exists()) {
+                userName = userDoc.getString("name") ?: ""
+                userDisplayId = userDoc.getString("id") ?: ""
+            }
+        } catch (e: Exception) {
+            // 에러 처리
+        }
+    }
 
     var groupMode by remember { mutableStateOf(false) }
     var groupName by remember { mutableStateOf("") }
@@ -237,8 +256,15 @@ fun ProfileScreen(
                 .background(Color(0xFFE0E0E0)),
             contentAlignment = Alignment.Center
         ) {
+            val displayText = when {
+                userName.isNotEmpty() -> userName.first().uppercaseChar().toString()
+                userDisplayId.isNotEmpty() -> userDisplayId.first().uppercaseChar().toString()
+                currentUserEmail?.isNotEmpty() == true -> currentUserEmail.first().uppercaseChar().toString()
+                else -> "U"
+            }
+
             Text(
-                text = (currentUserEmail ?: currentUserId).first().uppercaseChar().toString(),
+                text = displayText,
                 fontSize = 48.sp,
                 color = Color.White,
                 fontWeight = FontWeight.Bold
@@ -246,11 +272,22 @@ fun ProfileScreen(
         }
 
         Spacer(modifier = Modifier.height(12.dp))
-        Text(currentUserEmail ?: currentUserId, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+
+        val displayName = when {
+            userName.isNotEmpty() -> userName
+            userDisplayId.isNotEmpty() -> userDisplayId
+            currentUserEmail?.isNotEmpty() == true -> currentUserEmail
+            else -> currentUserId
+        }
+
+        Text(displayName, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        if (userDisplayId.isNotEmpty()) {
+            Text("@$userDisplayId", fontSize = 16.sp, color = Color.Gray)
+        }
         Spacer(modifier = Modifier.height(16.dp))
 
         Button(
-            onClick = { /* 프로필 수정 예정 */ },
+            onClick = { },
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF0F0F0)),
             shape = RoundedCornerShape(24.dp),
             modifier = Modifier.width(350.dp)
@@ -259,8 +296,6 @@ fun ProfileScreen(
         }
 
         Spacer(modifier = Modifier.height(28.dp))
-
-        // Friends 상단
         Row(
             modifier = Modifier
                 .fillMaxWidth()

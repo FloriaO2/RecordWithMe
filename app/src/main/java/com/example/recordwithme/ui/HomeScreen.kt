@@ -125,32 +125,6 @@ fun HomeScreen() {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 2. 대표사진(가족사진 등) 공간
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(220.dp)
-        ) {
-            Card(
-                modifier = Modifier
-                    .fillMaxSize(),
-                elevation = 4.dp
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color(0xFFE0E0E0)), // 연한 회색
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("대표사진 자리", color = Color.Gray)
-                }
-            }
-        }
-
-        // 아래에 추가 컨텐츠가 있다면 여기에 배치
-        // ...
-
-        // 선택된 그룹의 날짜별 사진들 표시
         val photosToShow = selectedGroup?.photos ?: groupList.flatMap { it.photos }
         if (photosToShow.isEmpty()) {
             Box(
@@ -164,10 +138,35 @@ fun HomeScreen() {
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f, fill = true)
-                    .padding(top = 8.dp),
+                    .weight(1f, fill = true),
                 contentPadding = PaddingValues(bottom = 32.dp)
             ) {
+                // 대표사진 아이템
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(220.dp)
+                            .padding(horizontal = 16.dp)
+                    ) {
+                        Card(
+                            modifier = Modifier.fillMaxSize(),
+                            elevation = 4.dp
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color(0xFFE0E0E0)), // 연한 회색
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("대표사진 자리", color = Color.Gray)
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+
+                // 날짜별 사진들
                 photosByDate.forEach { (date, photos) ->
                     item {
                         Spacer(modifier = Modifier.height(16.dp))

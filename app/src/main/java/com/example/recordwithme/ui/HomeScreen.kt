@@ -403,7 +403,7 @@ fun HomeScreen() {
                         },
                         modifier = Modifier
                             .align(Alignment.CenterStart)
-                            .size(80.dp)
+                            .size(64.dp)
                             .padding(start = 24.dp)
                     ) {
                         Icon(
@@ -424,7 +424,7 @@ fun HomeScreen() {
                         },
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
-                            .size(80.dp)
+                            .size(64.dp)
                             .padding(end = 24.dp)
                     ) {
                         Icon(

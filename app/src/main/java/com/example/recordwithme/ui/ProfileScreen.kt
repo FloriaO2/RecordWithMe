@@ -361,19 +361,22 @@ fun ProfileScreen(
                 .await()
             friends = snapshot.documents.mapNotNull { doc ->
                 val id = doc.id
-                val name = doc.getString("name") ?: return@mapNotNull null
                 
-                // name이 비어있거나 공백인 경우에만 이메일에서 @gmail.com 제거
-                val displayName = if (name.isBlank()) {
-                    val friendUserDoc = firestore.collection("users").document(id).get().await()
-                    val friendEmail = friendUserDoc.getString("email") ?: ""
-                    if (friendEmail.endsWith("@gmail.com")) {
-                        friendEmail.removeSuffix("@gmail.com")
-                    } else {
-                        friendEmail
-                    }
-                } else {
+                // 친구의 사용자 문서에서 정보 가져오기
+                val friendUserDoc = firestore.collection("users").document(id).get().await()
+                val name = friendUserDoc.getString("name") ?: ""
+                val email = friendUserDoc.getString("email") ?: ""
+                
+                // 1순위: name이 설정되어 있고 비어있지 않은 경우 name 사용
+                // 2순위: name이 없거나 비어있는 경우 이메일 사용 (@gmail.com 제거)
+                val displayName = if (name.isNotBlank()) {
                     name
+                } else {
+                    if (email.endsWith("@gmail.com")) {
+                        email.removeSuffix("@gmail.com")
+                    } else {
+                        email
+                    }
                 }
                 
                 Friend(id, displayName, "친구")

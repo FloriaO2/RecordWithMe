@@ -1,12 +1,15 @@
 package com.example.recordwithme.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -31,6 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 
@@ -45,10 +49,25 @@ fun GroupScreen(navController: NavController) {
     val firestore = FirebaseFirestore.getInstance()
     val groups = remember { mutableStateListOf<UserGroup>() }
     val isLoading = remember { mutableStateOf(true) }
+    val friends = remember { mutableStateListOf<String>() }
 
     // Firestore에서 데이터 가져오기
     LaunchedEffect(true) {
         try {
+            // 현재 사용자 ID 가져오기
+            val auth = FirebaseAuth.getInstance()
+            val currentUserId = auth.currentUser?.uid ?: return@LaunchedEffect
+            
+            // 친구 목록 가져오기
+            val friendsSnapshot = firestore.collection("users")
+                .document(currentUserId)
+                .collection("friends")
+                .get()
+                .await()
+            friends.clear()
+            friends.addAll(friendsSnapshot.documents.map { it.id })
+            
+            // 그룹 목록 가져오기
             val snapshot = firestore.collection("groups").get().await()
             groups.clear()
             for (document in snapshot.documents) {
@@ -70,7 +89,12 @@ fun GroupScreen(navController: NavController) {
     }
 
     Box(modifier = Modifier.fillMaxSize()) {  // Box로 전체 화면을 감쌈
-        Column(modifier = Modifier.padding(25.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.White)
+                .padding(25.dp)
+        ) {
             Spacer(modifier = Modifier.width(16.dp))
             Text(
                 text = "My Groups",
@@ -85,11 +109,57 @@ fun GroupScreen(navController: NavController) {
                 // 그룹이 없다면 안내 메시지 표시
                 if (groups.isEmpty()) {
                     Spacer(modifier = Modifier.padding(16.dp))
-                    Text(
-                        text = "그룹이 없습니다.\n지금 바로 그룹을 만들어보세요!",
-                        style = MaterialTheme.typography.bodyMedium.copy(color = Color.Gray),
-                        modifier = Modifier.align(Alignment.CenterHorizontally)
-                    )
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = "그룹이 없습니다.",
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                color = Color.Gray,
+                                lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * 0.5f
+                            )
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "지금 바로 그룹을 만들어보세요!",
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    color = Color.Gray,
+                                    lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * 0.5f
+                                )
+                            )
+                            Spacer(modifier = Modifier.padding(4.dp))
+                            Text(
+                                text = "그룹 만들기",
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Bold,
+                                    lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * 1.5f
+                                ),
+                                modifier = Modifier.clickable {
+                                    // + 버튼과 동일한 동작
+                                    println("GroupScreen: Creating group from text click")
+                                    if (friends.isEmpty()) {
+                                        // 친구가 없을 때만 안내 팝업 표시
+                                        println("GroupScreen: No friends available, showing dialog")
+                                        GroupModeState.isGroupMode = true
+                                        navController.navigate("profile") {
+                                            launchSingleTop = true
+                                        }
+                                    } else {
+                                        // 친구가 있으면 바로 ProfileScreen으로 이동
+                                        println("GroupScreen: Friends available, navigating to profile")
+                                        GroupModeState.isGroupMode = true
+                                        navController.navigate("profile") {
+                                            launchSingleTop = true
+                                        }
+                                    }
+                                }
+                            )
+                        }
+                    }
                 } else {
                     groups.forEach { group ->
                         GroupItem(name = group.name, membersCount = group.membersCount)
@@ -103,16 +173,28 @@ fun GroupScreen(navController: NavController) {
         // FloatingActionButton은 Box로 감싸고, 아래쪽 우측에 고정시킵니다.
         FloatingActionButton(
             onClick = { 
-                // ProfileScreen으로 이동하면서 groupMode를 활성화
-                println("GroupScreen: Setting groupMode to true and navigating to profile")
-                GroupModeState.isGroupMode = true
-                navController.navigate("profile") {
-                    launchSingleTop = true
+                // 친구가 없으면 안내 팝업을 띄우고, 있으면 ProfileScreen으로 이동
+                if (friends.isEmpty()) {
+                    // 친구가 없을 때만 안내 팝업 표시
+                    println("GroupScreen: No friends available, showing dialog")
+                    // 여기서 안내 팝업을 표시하는 로직을 추가할 수 있습니다
+                    // 현재는 ProfileScreen에서 처리하므로 바로 이동
+                    GroupModeState.isGroupMode = true
+                    navController.navigate("profile") {
+                        launchSingleTop = true
+                    }
+                } else {
+                    // 친구가 있으면 바로 ProfileScreen으로 이동
+                    println("GroupScreen: Friends available, navigating to profile")
+                    GroupModeState.isGroupMode = true
+                    navController.navigate("profile") {
+                        launchSingleTop = true
+                    }
                 }
             },
             modifier = Modifier
                 .align(Alignment.BottomEnd)  // 항상 우측 하단에 고정
-                .padding(16.dp), // 버튼 주변 여백
+                .padding(end = 30.dp, bottom = 40.dp),
             containerColor = MaterialTheme.colorScheme.primary
         ) {
             Icon(imageVector = Icons.Filled.Add, contentDescription = "Add Group")

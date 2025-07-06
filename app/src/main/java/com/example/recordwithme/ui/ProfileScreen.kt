@@ -292,12 +292,14 @@ fun ProfileScreen(
 
     var showFriendDialog by remember { mutableStateOf(false) }
     var showGroupDialog by remember { mutableStateOf(false) }
+    var showNoFriendsDialog by remember { mutableStateOf(false) }
     var friends by remember { mutableStateOf<List<Friend>>(emptyList()) }
     val selectedFriendIds = remember { mutableStateListOf<String>() }
     var userName by remember { mutableStateOf("") }
     var userDisplayId by remember { mutableStateOf("") }
     var groupName by remember { mutableStateOf("") }
     var groupNote by remember { mutableStateOf("") }
+    var friendsLoaded by remember { mutableStateOf(false) }
 
     // 전역 상태 사용
     var groupMode by remember { mutableStateOf(GroupModeState.isGroupMode) }
@@ -307,9 +309,21 @@ fun ProfileScreen(
         groupMode = GroupModeState.isGroupMode
     }
 
-    // groupMode 상태 변화 추적
-    LaunchedEffect(groupMode) {
-        println("ProfileScreen: groupMode changed to = $groupMode")
+    // groupMode가 true가 되었을 때 친구가 없으면 팝업 표시
+    LaunchedEffect(groupMode, friendsLoaded) {
+        println("ProfileScreen: groupMode changed to = $groupMode, friends count: ${friends.size}, friendsLoaded: $friendsLoaded")
+        // 친구 목록이 로드된 후에만 체크
+        if (groupMode && friendsLoaded) {
+            if (friends.isNotEmpty()) {
+                // 친구가 있으면 그룹 모드 활성화
+                println("ProfileScreen: Friends available, enabling group mode")
+            } else {
+                // 친구가 없을 때만 안내 팝업 표시
+                println("ProfileScreen: No friends available, showing dialog")
+                showNoFriendsDialog = true
+                GroupModeState.isGroupMode = false
+            }
+        }
     }
 
     val listState = rememberLazyListState()
@@ -348,14 +362,33 @@ fun ProfileScreen(
             friends = snapshot.documents.mapNotNull { doc ->
                 val id = doc.id
                 val name = doc.getString("name") ?: return@mapNotNull null
-                Friend(id, name, "친구")
+                
+                // name이 비어있거나 공백인 경우에만 이메일에서 @gmail.com 제거
+                val displayName = if (name.isBlank()) {
+                    val friendUserDoc = firestore.collection("users").document(id).get().await()
+                    val friendEmail = friendUserDoc.getString("email") ?: ""
+                    if (friendEmail.endsWith("@gmail.com")) {
+                        friendEmail.removeSuffix("@gmail.com")
+                    } else {
+                        friendEmail
+                    }
+                } else {
+                    name
+                }
+                
+                Friend(id, displayName, "친구")
             }
+            friendsLoaded = true
         } catch (_: Exception) {}
     }
 
     // 전체 화면 Box로 감싸서 버튼을 고정 위치에 띄우기
     Box(modifier = Modifier.fillMaxSize()) {
-        Column(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.White)
+        ) {
 
             // 상단 프로필 영역
             Column(
@@ -437,34 +470,58 @@ fun ProfileScreen(
                             onClick = { showFriendDialog = true },
                             modifier = Modifier.width(70.dp).height(48.dp),
                             shape = RoundedCornerShape(10),
-                            border = BorderStroke(2.dp, Color.Gray),
-                            colors = ButtonDefaults.outlinedButtonColors(),
+                            border = BorderStroke(2.dp, if (showFriendDialog) Color(0xFF424242) else Color.Gray),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                containerColor = if (showFriendDialog) Color(0x59282828) else Color.Transparent
+                            ),
                             contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("+", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                Text("+", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = if (showFriendDialog) Color(0xFF424242) else Color.Black)
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Icon(Icons.Filled.Person, contentDescription = "Add Friend", modifier = Modifier.size(25.dp), tint = Color.Black)
+                                Icon(
+                                    Icons.Filled.Person, 
+                                    contentDescription = "Add Friend", 
+                                    modifier = Modifier.size(25.dp), 
+                                    tint = if (showFriendDialog) Color(0xFF424242) else Color.Black
+                                )
                             }
                         }
 
                         Button(
                             onClick = {
-                                GroupModeState.isGroupMode = !GroupModeState.isGroupMode
-                                if (!GroupModeState.isGroupMode) {
-                                    selectedFriendIds.clear()
+                                println("ProfileScreen: Group button clicked, friends count: ${friends.size}")
+                                if (friends.isEmpty()) {
+                                    // 친구가 없으면 안내 팝업을 띄우고 그룹 모드 해제
+                                    println("ProfileScreen: No friends, showing dialog")
+                                    showNoFriendsDialog = true
+                                    GroupModeState.isGroupMode = false
+                                } else {
+                                    // 친구가 있으면 그룹 모드 토글
+                                    println("ProfileScreen: Friends available, toggling group mode")
+                                    GroupModeState.isGroupMode = !GroupModeState.isGroupMode
+                                    if (!GroupModeState.isGroupMode) {
+                                        selectedFriendIds.clear()
+                                    }
                                 }
                             },
                             modifier = Modifier.width(70.dp).height(48.dp),
                             shape = RoundedCornerShape(10),
-                            border = BorderStroke(2.dp, Color.Gray),
-                            colors = ButtonDefaults.outlinedButtonColors(),
+                            border = BorderStroke(2.dp, if (groupMode) Color(0xBF424242) else Color.Gray),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                containerColor = if (groupMode) Color(0x59282828) else Color.Transparent
+                            ),
                             contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("+", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                Text("+", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = if (groupMode) Color(0xFF424242) else Color.Black)
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Icon(Icons.Filled.Group, contentDescription = "Add Group", modifier = Modifier.size(28.dp), tint = Color.Black)
+                                Icon(
+                                    Icons.Filled.Group, 
+                                    contentDescription = "Add Group", 
+                                    modifier = Modifier.size(28.dp), 
+                                    tint = if (groupMode) Color(0xFF424242) else Color.Black
+                                )
                             }
                         }
                     }
@@ -635,6 +692,30 @@ fun ProfileScreen(
                 onDismiss = { showFriendDialog = false },
                 onFriendAdded = { newFriend -> friends = friends + newFriend },
                 currentFriendIds = friends.map { it.id }
+            )
+        }
+
+        // 친구가 없을 때 안내 다이얼로그
+        if (showNoFriendsDialog) {
+            AlertDialog(
+                onDismissRequest = { showNoFriendsDialog = false },
+                title = { Text("친구가 필요합니다") },
+                text = { Text("그룹을 만들기 위해서는 먼저 친구를 추가해주세요.") },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            showNoFriendsDialog = false
+                            showFriendDialog = true
+                        }
+                    ) {
+                        Text("친구 추가하기")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showNoFriendsDialog = false }) {
+                        Text("취소")
+                    }
+                }
             )
         }
     }

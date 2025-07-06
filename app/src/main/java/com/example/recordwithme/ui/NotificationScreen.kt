@@ -451,7 +451,9 @@ fun NotificationScreen(
     }
     
     Column(
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.White)
     ) {
         // 상단 헤더
         Box(

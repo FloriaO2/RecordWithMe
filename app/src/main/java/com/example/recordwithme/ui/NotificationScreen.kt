@@ -96,7 +96,10 @@ fun FriendRequestItem(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
         shape = RoundedCornerShape(12.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFFFEFEFE) // 거의 흰색에 가까운 밝은 색
+        )
     ) {
         Column(
             modifier = Modifier.padding(16.dp)
@@ -194,7 +197,10 @@ fun GeneralNotificationItem(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
         shape = RoundedCornerShape(12.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFFFEFEFE) // 거의 흰색에 가까운 밝은 색
+        )
     ) {
         Row(
             modifier = Modifier.padding(16.dp),

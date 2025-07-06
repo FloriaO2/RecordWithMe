@@ -346,12 +346,25 @@ fun ProfileScreen(
         }
     }
 
-    // 프로필 이동 애니메이션
-    val profileOffset by animateFloatAsState(
+    // 프로필 이미지 이동 애니메이션
+    val profileImageOffset by animateFloatAsState(
         targetValue = if (showDetails) -0.23f else 0f,
         animationSpec = tween(1000),
-        label = "profileOffset"
+        label = "profileImageOffset"
     )
+
+    // 프로필 이미지 세로 위치 조정 (위로 이동)
+    val profileImageVerticalOffset = -50f
+
+    // 프로필 텍스트 이동 애니메이션 (구글 로그인일 때는 고정, 일반 로그인일 때만 이동)
+    val isGoogleLogin = !(currentUserEmail?.endsWith("@recordwith.me") == true)
+    val profileTextOffset by animateFloatAsState(
+        targetValue = if (showDetails && !isGoogleLogin) -0.23f else 0f,
+        animationSpec = tween(1000),
+        label = "profileTextOffset"
+    )
+
+
 
     // Details 우측에서 등장 애니메이션
     val detailsOffset by animateFloatAsState(
@@ -413,190 +426,269 @@ fun ProfileScreen(
                 .background(Color.White)
         ) {
 
-            // 상단 프로필 영역 - View Details 상태에 따라 레이아웃 변경
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .alpha(profileAlpha)
-                    .padding(vertical = 5.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // Profile 텍스트는 항상 상단 중앙에 고정
-                Text("Profile", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(25.dp))
-
-                // 프로필과 상세 정보를 포함하는 Box
-                Box(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = Alignment.Center
+            // 로딩 상태에 따른 화면 표시
+            if (friendsLoaded) {
+                // 로딩 완료: 모든 프로필 요소 표시
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .alpha(profileAlpha)
+                        .padding(vertical = 5.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // 좌측: 기존 프로필 (중앙에서 좌측으로 이동)
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.offset(
-                            x = with(LocalDensity.current) { 
-                                (profileOffset * 1200).toDp()
-                            }
-                        )
+                    // Profile 텍스트는 항상 상단 중앙에 고정
+                    Text(
+                        "Profile", 
+                        fontSize = 24.sp, 
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 10.dp, bottom = 10.dp)
+                    )
+
+                    // 프로필과 상세 정보를 포함하는 Box
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(140.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFFE0E0E0)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            val displayText = when {
-                                userName.isNotEmpty() -> userName.first().uppercaseChar().toString()
-                                userDisplayId.isNotEmpty() -> userDisplayId.first().uppercaseChar().toString()
-                                currentUserEmail?.isNotEmpty() == true -> currentUserEmail.first().uppercaseChar().toString()
-                                else -> "U"
-                            }
-
-                            Text(
-                                text = displayText,
-                                fontSize = 48.sp,
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        val displayName = when {
-                            userName.isNotEmpty() -> userName
-                            userDisplayId.isNotEmpty() -> userDisplayId
-                            currentUserEmail?.isNotEmpty() == true -> currentUserEmail
-                            else -> currentUserId
-                        }
-
-                        Text(displayName, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                        if (userDisplayId.isNotEmpty()) {
-                            Text("@$userDisplayId", fontSize = 16.sp, color = Color.Gray)
-                        }
-                    }
-
-                    // 우측: 상세 정보 (화면 바깥에서 들어옴)
-                    Column(
-                        modifier = Modifier
-                            .align(Alignment.CenterEnd)
-                            .padding(end = 24.dp)
-                            .width(200.dp)
-                            .offset(
+                        // 좌측: 프로필 이미지 (중앙에서 좌측으로 이동)
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.offset(
                                 x = with(LocalDensity.current) { 
-                                    (detailsOffset * 300).toDp()
+                                    (profileImageOffset * 1200).toDp()
+                                },
+                                y = with(LocalDensity.current) { 
+                                    profileImageVerticalOffset.toDp()
                                 }
                             )
-                    ) {
-                        // 상세 정보 내용
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(140.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFFE0E0E0)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                val displayText = when {
+                                    userName.isNotEmpty() -> userName.first().uppercaseChar().toString()
+                                    userDisplayId.isNotEmpty() -> userDisplayId.first().uppercaseChar().toString()
+                                    currentUserEmail?.isNotEmpty() == true -> currentUserEmail.first().uppercaseChar().toString()
+                                    else -> "U"
+                                }
+
+                                Text(
+                                    text = displayText,
+                                    fontSize = 48.sp,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
+                        // 프로필 텍스트 (이미지와 별도로 이동)
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.offset(
+                                x = with(LocalDensity.current) { 
+                                    (profileTextOffset * 1200).toDp()
+                                }
+                            )
+                        ) {
+                            Spacer(modifier = Modifier.height(160.dp)) // 이미지 높이 + 간격 (12dp 추가)
+
+                            val displayName = when {
+                                userName.isNotEmpty() -> userName
+                                userDisplayId.isNotEmpty() -> userDisplayId
+                                currentUserEmail?.isNotEmpty() == true -> currentUserEmail
+                                else -> currentUserId
+                            }
+
+                            Text(displayName, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                            if (userDisplayId.isNotEmpty()) {
+                                Text("@$userDisplayId", fontSize = 16.sp, color = Color.Gray)
+                            }
+                        }
+
+                        // 우측: 상세 정보 (화면 바깥에서 들어옴)
                         Column(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp)
+                                .align(Alignment.CenterEnd)
+                                .padding(end = 24.dp)
+                                .width(200.dp)
+                                .offset(
+                                    x = with(LocalDensity.current) { 
+                                        (detailsOffset * 300).toDp()
+                                    },
+                                    y = if (isGoogleLogin) (-11).dp else 20.dp
+                                )
                         ) {
-                            DetailItem("이름", userName.ifEmpty { "설정되지 않음" })
-                            DetailItem("아이디", userDisplayId.ifEmpty { "설정되지 않음" })
-                            DetailItem("이메일", currentUserEmail ?: "설정되지 않음")
-                            DetailItem("친구 수", "${friends.size}명")
+                            // 상세 정보 내용
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = 16.dp, top = 16.dp, bottom = 16.dp)
+                            ) {
+                                // 구글 로그인인지 확인 (@recordwith.me가 아닌 경우 모두 구글 로그인)
+                                val isGoogleLogin = !(currentUserEmail?.endsWith("@recordwith.me") == true)
+                                
+                                if (isGoogleLogin) {
+                                    // 구글 로그인: 이메일/친구수만 표시
+                                    val email = currentUserEmail ?: "설정되지 않음"
+                                    if (email != "설정되지 않음" && email.contains("@")) {
+                                        val parts = email.split("@")
+                                        DetailItem("이메일", "${parts[0]}\n@${parts[1]}")
+                                    } else {
+                                        DetailItem("이메일", email)
+                                    }
+                                    DetailItem("친구 수", "${friends.size}명")
+                                } else {
+                                    // 일반 로그인: 이름/아이디/친구수만 표시
+                                    DetailItem("이름", userName.ifEmpty { "설정되지 않음" })
+                                    DetailItem("아이디", userDisplayId.ifEmpty { "설정되지 않음" })
+                                    DetailItem("친구 수", "${friends.size}명")
+                                }
+                                
+                                // 회원 탈퇴 버튼
+                                TextButton(
+                                    onClick = {
+                                        // 회원 탈퇴 로직 구현
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .offset(y = (-12).dp, x = 12.dp)
+                                ) {
+                                    Text(
+                                        "회원 탈퇴",
+                                        color = Color(0xFF8B0000), // 검붉은 색
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        textAlign = TextAlign.End
+                                    )
+                                }
+                            }
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // 버튼은 항상 같은 위치와 너비로 고정
+                    Button(
+                        onClick = { showDetails = !showDetails },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF0F0F0)),
+                        shape = RoundedCornerShape(24.dp),
+                        modifier = Modifier.width(350.dp)
+                    ) {
+                        Text(
+                            if (showDetails) "Close Details" else "View Details", 
+                            color = Color.Black
+                        )
+                    }
                 }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // 버튼은 항상 같은 위치와 너비로 고정
-                Button(
-                    onClick = { showDetails = !showDetails },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF0F0F0)),
-                    shape = RoundedCornerShape(24.dp),
-                    modifier = Modifier.width(350.dp)
+            } else {
+                // 로딩 중: Profile 텍스트와 로딩 애니메이션만 표시
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 5.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        if (showDetails) "Close Details" else "View Details", 
-                        color = Color.Black
+                        "Profile", 
+                        fontSize = 24.sp, 
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 10.dp, bottom = 10.dp)
+                    )
+                    
+                    Spacer(modifier = Modifier.height(100.dp))
+                    
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(48.dp),
+                        color = Color(0xFFE0E0E0)
                     )
                 }
             }
 
-            // Friends 영역
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.White)
-                    .height(80.dp)
-                    .padding(horizontal = 40.dp, vertical = 12.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+            // Friends 영역 (로딩 완료 후에만 표시)
+            if (friendsLoaded) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color.White)
+                        .height(80.dp)
+                        .padding(horizontal = 40.dp, vertical = 12.dp)
                 ) {
-                    Text("Friends", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    Row(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Friends", fontSize = 20.sp, fontWeight = FontWeight.Bold)
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(
-                            onClick = { showFriendDialog = true },
-                            modifier = Modifier.width(70.dp).height(48.dp),
-                            shape = RoundedCornerShape(10),
-                            border = BorderStroke(2.dp, if (showFriendDialog) Color(0xFF424242) else Color.Gray),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                containerColor = if (showFriendDialog) Color(0x59282828) else Color.Transparent
-                            ),
-                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("+", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = if (showFriendDialog) Color(0xFF424242) else Color.Black)
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Icon(
-                                    Icons.Filled.Person, 
-                                    contentDescription = "Add Friend", 
-                                    modifier = Modifier.size(25.dp), 
-                                    tint = if (showFriendDialog) Color(0xFF424242) else Color.Black
-                                )
-                            }
-                        }
-
-                        Button(
-                            onClick = {
-                                println("ProfileScreen: Group button clicked, friends count: ${friends.size}")
-                                if (friends.isEmpty()) {
-                                    // 친구가 없으면 안내 팝업을 띄우고 그룹 모드 해제
-                                    println("ProfileScreen: No friends, showing dialog")
-                                    showNoFriendsDialog = true
-                                    GroupModeState.isGroupMode = false
-                                } else {
-                                    // 친구가 있으면 그룹 모드 토글
-                                    println("ProfileScreen: Friends available, toggling group mode")
-                                    GroupModeState.isGroupMode = !GroupModeState.isGroupMode
-                                    if (!GroupModeState.isGroupMode) {
-                                        selectedFriendIds.clear()
-                                    }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = { showFriendDialog = true },
+                                modifier = Modifier.width(70.dp).height(48.dp),
+                                shape = RoundedCornerShape(10),
+                                border = BorderStroke(2.dp, if (showFriendDialog) Color(0xFF424242) else Color.Gray),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    containerColor = if (showFriendDialog) Color(0x59282828) else Color.Transparent
+                                ),
+                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("+", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = if (showFriendDialog) Color(0xFF424242) else Color.Black)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Icon(
+                                        Icons.Filled.Person, 
+                                        contentDescription = "Add Friend", 
+                                        modifier = Modifier.size(25.dp), 
+                                        tint = if (showFriendDialog) Color(0xFF424242) else Color.Black
+                                    )
                                 }
-                            },
-                            modifier = Modifier.width(70.dp).height(48.dp),
-                            shape = RoundedCornerShape(10),
-                            border = BorderStroke(2.dp, if (groupMode) Color(0xBF424242) else Color.Gray),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                containerColor = if (groupMode) Color(0x59282828) else Color.Transparent
-                            ),
-                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("+", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = if (groupMode) Color(0xFF424242) else Color.Black)
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Icon(
-                                    Icons.Filled.Group, 
-                                    contentDescription = "Add Group", 
-                                    modifier = Modifier.size(28.dp), 
-                                    tint = if (groupMode) Color(0xFF424242) else Color.Black
-                                )
+                            }
+
+                            Button(
+                                onClick = {
+                                    println("ProfileScreen: Group button clicked, friends count: ${friends.size}")
+                                    if (friends.isEmpty()) {
+                                        // 친구가 없으면 안내 팝업을 띄우고 그룹 모드 해제
+                                        println("ProfileScreen: No friends, showing dialog")
+                                        showNoFriendsDialog = true
+                                        GroupModeState.isGroupMode = false
+                                    } else {
+                                        // 친구가 있으면 그룹 모드 토글
+                                        println("ProfileScreen: Friends available, toggling group mode")
+                                        GroupModeState.isGroupMode = !GroupModeState.isGroupMode
+                                        if (!GroupModeState.isGroupMode) {
+                                            selectedFriendIds.clear()
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.width(70.dp).height(48.dp),
+                                shape = RoundedCornerShape(10),
+                                border = BorderStroke(2.dp, if (groupMode) Color(0xBF424242) else Color.Gray),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    containerColor = if (groupMode) Color(0x59282828) else Color.Transparent
+                                ),
+                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("+", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = if (groupMode) Color(0xFF424242) else Color.Black)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Icon(
+                                        Icons.Filled.Group, 
+                                        contentDescription = "Add Group", 
+                                        modifier = Modifier.size(28.dp), 
+                                        tint = if (groupMode) Color(0xFF424242) else Color.Black
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
 
-            if (friends.isEmpty()) {
+            if (friendsLoaded && friends.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -618,57 +710,59 @@ fun ProfileScreen(
                 }
             }
 
-            LazyColumn(
-                state = listState,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(friends) { friend ->
-                    val isSelected = friend.id in selectedFriendIds
+            if (friendsLoaded) {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(friends) { friend ->
+                        val isSelected = friend.id in selectedFriendIds
 
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        if (groupMode) {
-                            println("ProfileScreen: Rendering checkbox for friend ${friend.name}, groupMode = $groupMode")
-                            Checkbox(
-                                checked = isSelected,
-                                onCheckedChange = {
-                                    if (it) selectedFriendIds.add(friend.id)
-                                    else selectedFriendIds.remove(friend.id)
-                                },
-                                colors = CheckboxDefaults.colors(
-                                    checkedColor = Color.White,
-                                    checkmarkColor = Color.Black,
-                                    uncheckedColor = Color.Gray
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            if (groupMode) {
+                                println("ProfileScreen: Rendering checkbox for friend ${friend.name}, groupMode = $groupMode")
+                                Checkbox(
+                                    checked = isSelected,
+                                    onCheckedChange = {
+                                        if (it) selectedFriendIds.add(friend.id)
+                                        else selectedFriendIds.remove(friend.id)
+                                    },
+                                    colors = CheckboxDefaults.colors(
+                                        checkedColor = Color.White,
+                                        checkmarkColor = Color.Black,
+                                        uncheckedColor = Color.Gray
+                                    )
                                 )
-                            )
-                        } else {
-                            println("ProfileScreen: Not rendering checkbox, groupMode = $groupMode")
-                        }
-
-                        FriendItem(
-                            friend = friend,
-                            isSelected = isSelected,
-                            groupMode = groupMode,
-                            onRemoveClick = { toRemove ->
-                                firestore.collection("users").document(currentUserId)
-                                    .collection("friends").document(toRemove.id).delete()
-                                friends = friends.filter { it.id != toRemove.id }
-                                selectedFriendIds.remove(toRemove.id)
+                            } else {
+                                println("ProfileScreen: Not rendering checkbox, groupMode = $groupMode")
                             }
-                        )
+
+                            FriendItem(
+                                friend = friend,
+                                isSelected = isSelected,
+                                groupMode = groupMode,
+                                onRemoveClick = { toRemove ->
+                                    firestore.collection("users").document(currentUserId)
+                                        .collection("friends").document(toRemove.id).delete()
+                                    friends = friends.filter { it.id != toRemove.id }
+                                    selectedFriendIds.remove(toRemove.id)
+                                }
+                            )
+                        }
                     }
                 }
             }
         }
 
         // ✅ 하단 중앙 고정 버튼 (오버레이 방식, 배경 없음)
-        if (groupMode && selectedFriendIds.isNotEmpty()) {
+        if (friendsLoaded && groupMode && selectedFriendIds.isNotEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxSize(),

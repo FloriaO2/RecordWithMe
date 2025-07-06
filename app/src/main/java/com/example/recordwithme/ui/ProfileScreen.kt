@@ -53,10 +53,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
-import com.google.firebase.database.FirebaseDatabase
 
 // 데이터 클래스들
 data class Friend(val id: String, val name: String, val mutual: String) {
@@ -273,9 +274,15 @@ fun FriendSearchDialog(
     )
 }
 
+// 전역 상태로 groupMode 관리
+object GroupModeState {
+    var isGroupMode by mutableStateOf(false)
+}
+
 // 최종 ProfileScreen 컴포저블
 @Composable
 fun ProfileScreen(
+    navController: NavController,
     firestore: FirebaseFirestore = FirebaseFirestore.getInstance()
 ) {
     val auth = remember { FirebaseAuth.getInstance() }
@@ -289,9 +296,21 @@ fun ProfileScreen(
     val selectedFriendIds = remember { mutableStateListOf<String>() }
     var userName by remember { mutableStateOf("") }
     var userDisplayId by remember { mutableStateOf("") }
-    var groupMode by remember { mutableStateOf(false) }
     var groupName by remember { mutableStateOf("") }
     var groupNote by remember { mutableStateOf("") }
+
+    // 전역 상태 사용
+    var groupMode by remember { mutableStateOf(GroupModeState.isGroupMode) }
+    
+    // 전역 상태 변화 감지
+    LaunchedEffect(GroupModeState.isGroupMode) {
+        groupMode = GroupModeState.isGroupMode
+    }
+
+    // groupMode 상태 변화 추적
+    LaunchedEffect(groupMode) {
+        println("ProfileScreen: groupMode changed to = $groupMode")
+    }
 
     val listState = rememberLazyListState()
     val profileHeightDp = 320.dp
@@ -431,8 +450,10 @@ fun ProfileScreen(
 
                         Button(
                             onClick = {
-                                groupMode = !groupMode
-                                if (!groupMode) selectedFriendIds.clear()
+                                GroupModeState.isGroupMode = !GroupModeState.isGroupMode
+                                if (!GroupModeState.isGroupMode) {
+                                    selectedFriendIds.clear()
+                                }
                             },
                             modifier = Modifier.width(70.dp).height(48.dp),
                             shape = RoundedCornerShape(10),
@@ -458,7 +479,11 @@ fun ProfileScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "친구가 없습니다.\n친구 추가 버튼을 눌러 친구를 추가해보세요.",
+                        text = if (groupMode) {
+                            "그룹을 만들기 위해서는 먼저 친구를 추가해주세요.\n친구 추가 버튼을 눌러 친구를 추가해보세요."
+                        } else {
+                            "친구가 없습니다.\n친구 추가 버튼을 눌러 친구를 추가해보세요."
+                        },
                         color = Color.Gray,
                         fontSize = 14.sp,
                         lineHeight = 30.sp,
@@ -484,6 +509,7 @@ fun ProfileScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         if (groupMode) {
+                            println("ProfileScreen: Rendering checkbox for friend ${friend.name}, groupMode = $groupMode")
                             Checkbox(
                                 checked = isSelected,
                                 onCheckedChange = {
@@ -496,6 +522,8 @@ fun ProfileScreen(
                                     uncheckedColor = Color.Gray
                                 )
                             )
+                        } else {
+                            println("ProfileScreen: Not rendering checkbox, groupMode = $groupMode")
                         }
 
                         FriendItem(
@@ -578,8 +606,9 @@ fun ProfileScreen(
                             groupName = ""
                             groupNote = ""
                             selectedFriendIds.clear()
-                            groupMode = false
+                            GroupModeState.isGroupMode = false
                             showGroupDialog = false
+                            navController.popBackStack() // 그룹 생성 후 GroupScreen으로 돌아가기
                         }
                     }) {
                         Text("완료")

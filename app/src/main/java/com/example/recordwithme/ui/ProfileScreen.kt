@@ -1,5 +1,7 @@
 package com.example.recordwithme.ui
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -11,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -300,6 +303,9 @@ fun ProfileScreen(
     var groupName by remember { mutableStateOf("") }
     var groupNote by remember { mutableStateOf("") }
     var friendsLoaded by remember { mutableStateOf(false) }
+    
+    // View Details 상태 관리
+    var showDetails by remember { mutableStateOf(false) }
 
     // 전역 상태 사용
     var groupMode by remember { mutableStateOf(GroupModeState.isGroupMode) }
@@ -339,6 +345,20 @@ fun ProfileScreen(
             ((maxOffset - offsetPx) / maxOffset).coerceIn(0f, 1f)
         }
     }
+
+    // 프로필 이동 애니메이션
+    val profileOffset by animateFloatAsState(
+        targetValue = if (showDetails) -0.23f else 0f,
+        animationSpec = tween(1000),
+        label = "profileOffset"
+    )
+
+    // Details 우측에서 등장 애니메이션
+    val detailsOffset by animateFloatAsState(
+        targetValue = if (showDetails) 0f else 3f,
+        animationSpec = tween(1000),
+        label = "detailsOffset"
+    )
 
     // 사용자 정보 및 친구 목록 불러오기
     LaunchedEffect(currentUserId) {
@@ -393,7 +413,7 @@ fun ProfileScreen(
                 .background(Color.White)
         ) {
 
-            // 상단 프로필 영역
+            // 상단 프로필 영역 - View Details 상태에 따라 레이아웃 변경
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -401,56 +421,101 @@ fun ProfileScreen(
                     .padding(vertical = 5.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                // Profile 텍스트는 항상 상단 중앙에 고정
                 Text("Profile", fontSize = 24.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(25.dp))
 
+                // 프로필과 상세 정보를 포함하는 Box
                 Box(
-                    modifier = Modifier
-                        .size(140.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFFE0E0E0)),
+                    modifier = Modifier.fillMaxWidth(),
                     contentAlignment = Alignment.Center
                 ) {
-                    val displayText = when {
-                        userName.isNotEmpty() -> userName.first().uppercaseChar().toString()
-                        userDisplayId.isNotEmpty() -> userDisplayId.first().uppercaseChar().toString()
-                        currentUserEmail?.isNotEmpty() == true -> currentUserEmail.first().uppercaseChar().toString()
-                        else -> "U"
+                    // 좌측: 기존 프로필 (중앙에서 좌측으로 이동)
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.offset(
+                            x = with(LocalDensity.current) { 
+                                (profileOffset * 1200).toDp()
+                            }
+                        )
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(140.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFE0E0E0)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            val displayText = when {
+                                userName.isNotEmpty() -> userName.first().uppercaseChar().toString()
+                                userDisplayId.isNotEmpty() -> userDisplayId.first().uppercaseChar().toString()
+                                currentUserEmail?.isNotEmpty() == true -> currentUserEmail.first().uppercaseChar().toString()
+                                else -> "U"
+                            }
+
+                            Text(
+                                text = displayText,
+                                fontSize = 48.sp,
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        val displayName = when {
+                            userName.isNotEmpty() -> userName
+                            userDisplayId.isNotEmpty() -> userDisplayId
+                            currentUserEmail?.isNotEmpty() == true -> currentUserEmail
+                            else -> currentUserId
+                        }
+
+                        Text(displayName, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                        if (userDisplayId.isNotEmpty()) {
+                            Text("@$userDisplayId", fontSize = 16.sp, color = Color.Gray)
+                        }
                     }
 
-                    Text(
-                        text = displayText,
-                        fontSize = 48.sp,
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                val displayName = when {
-                    userName.isNotEmpty() -> userName
-                    userDisplayId.isNotEmpty() -> userDisplayId
-                    currentUserEmail?.isNotEmpty() == true -> currentUserEmail
-                    else -> currentUserId
-                }
-
-                Text(displayName, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                if (userDisplayId.isNotEmpty()) {
-                    Text("@$userDisplayId", fontSize = 16.sp, color = Color.Gray)
+                    // 우측: 상세 정보 (화면 바깥에서 들어옴)
+                    Column(
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .padding(end = 24.dp)
+                            .width(200.dp)
+                            .offset(
+                                x = with(LocalDensity.current) { 
+                                    (detailsOffset * 300).toDp()
+                                }
+                            )
+                    ) {
+                        // 상세 정보 내용
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp)
+                        ) {
+                            DetailItem("이름", userName.ifEmpty { "설정되지 않음" })
+                            DetailItem("아이디", userDisplayId.ifEmpty { "설정되지 않음" })
+                            DetailItem("이메일", currentUserEmail ?: "설정되지 않음")
+                            DetailItem("친구 수", "${friends.size}명")
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
+                // 버튼은 항상 같은 위치와 너비로 고정
                 Button(
-                    onClick = {},
+                    onClick = { showDetails = !showDetails },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF0F0F0)),
                     shape = RoundedCornerShape(24.dp),
                     modifier = Modifier.width(350.dp)
                 ) {
-                    Text("Edit Profile", color = Color.Black)
+                    Text(
+                        if (showDetails) "Close Details" else "View Details", 
+                        color = Color.Black
+                    )
                 }
-
             }
 
             // Friends 영역
@@ -721,5 +786,28 @@ fun ProfileScreen(
                 }
             )
         }
+    }
+}
+
+// 상세 정보 아이템 컴포저블
+@Composable
+fun DetailItem(label: String, value: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = label,
+            fontSize = 14.sp,
+            color = Color.Gray,
+            fontWeight = FontWeight.Medium
+        )
+        Text(
+            text = value,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold
+        )
     }
 }

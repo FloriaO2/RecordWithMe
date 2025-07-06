@@ -131,7 +131,7 @@ fun GroupScreen(navController: NavController) {
                                 )
                             )
                             Spacer(modifier = Modifier.padding(4.dp))
-                            Text(
+                    Text(
                                 text = "그룹 만들기",
                                 style = MaterialTheme.typography.bodyMedium.copy(
                                     color = MaterialTheme.colorScheme.primary,

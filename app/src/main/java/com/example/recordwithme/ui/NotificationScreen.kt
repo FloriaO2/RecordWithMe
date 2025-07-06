@@ -74,7 +74,7 @@ data class Notification(
             val date = Date(timestamp)
             val now = Date()
             val diff = now.time - timestamp
-
+            
             return when {
                 diff < 60000 -> "방금 전" // 1분 미만
                 diff < 3600000 -> "${diff / 60000}분 전" // 1시간 미만
@@ -119,9 +119,9 @@ fun FriendRequestItem(
                         fontWeight = FontWeight.Bold
                     )
                 }
-
+                
                 Spacer(modifier = Modifier.width(12.dp))
-
+                
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = notification.fromUserName,
@@ -140,9 +140,9 @@ fun FriendRequestItem(
                     )
                 }
             }
-
+            
             Spacer(modifier = Modifier.height(12.dp))
-
+            
             // 수락/거절 버튼
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -164,7 +164,7 @@ fun FriendRequestItem(
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("수락")
                 }
-
+                
                 OutlinedButton(
                     onClick = { onReject(notification) },
                     modifier = Modifier.weight(1f),
@@ -206,22 +206,22 @@ fun GeneralNotificationItem(
                 "friend_rejected" -> Icons.Filled.Cancel
                 else -> Icons.Filled.Notifications
             }
-
+            
             val iconColor = when (notification.type) {
                 "friend_accepted" -> Color(0xFF4CAF50)
                 "friend_rejected" -> Color(0xFFF44336)
                 else -> Color(0xFF2196F3)
             }
-
+            
             Icon(
                 icon,
                 contentDescription = "Notification",
                 tint = iconColor,
                 modifier = Modifier.size(24.dp)
             )
-
+            
             Spacer(modifier = Modifier.width(12.dp))
-
+            
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = when (notification.type) {
@@ -253,7 +253,7 @@ fun FriendRequestDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("친구 요청") },
-        text = {
+        text = { 
             Text("${notification.fromUserName}님의 친구 요청을 수락하시겠습니까?")
         },
         confirmButton = {
@@ -293,25 +293,25 @@ fun NotificationScreen(
     val currentUser = auth.currentUser ?: return
     val currentUserId = currentUser.uid
     val context = LocalContext.current
-
+    
     var notifications by remember { mutableStateOf<List<Notification>>(emptyList()) }
     var showDialog by remember { mutableStateOf<Notification?>(null) }
     var loading by remember { mutableStateOf(true) }
-
+    
     // Realtime Database 리스너 설정
     DisposableEffect(currentUserId) {
         val realtimeDb = FirebaseDatabase.getInstance().reference
         val notificationsRef = realtimeDb.child("notifications").child(currentUserId)
-
+        
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val newNotifications = mutableListOf<Notification>()
-
+                
                 for (childSnapshot in snapshot.children) {
                     val fromUserId = childSnapshot.child("fromUserId").getValue(String::class.java) ?: continue
                     val fromUserName = childSnapshot.child("fromUserName").getValue(String::class.java) ?: continue
                     val timestamp = childSnapshot.child("timestamp").getValue(Long::class.java) ?: continue
-
+                    
                     newNotifications.add(
                         Notification(
                             id = childSnapshot.key ?: "",
@@ -322,7 +322,7 @@ fun NotificationScreen(
                         )
                     )
                 }
-
+                
                 // Firestore에서 기존 알림들도 가져오기 (비동기 처리)
                 firestore.collection("users")
                     .document(currentUserId)
@@ -334,7 +334,7 @@ fun NotificationScreen(
                             val fromUserId = doc.getString("fromUserId") ?: return@mapNotNull null
                             val fromUserName = doc.getString("fromUserName") ?: return@mapNotNull null
                             val timestamp = doc.getLong("timestamp") ?: return@mapNotNull null
-
+                            
                             Notification(
                                 id = doc.id,
                                 type = type,
@@ -343,7 +343,7 @@ fun NotificationScreen(
                                 timestamp = timestamp
                             )
                         }
-
+                        
                         // 모든 알림을 합치고 시간순으로 정렬
                         notifications = (newNotifications + firestoreNotifications)
                             .sortedByDescending { it.timestamp }
@@ -354,20 +354,20 @@ fun NotificationScreen(
                         loading = false
                     }
             }
-
+            
             override fun onCancelled(error: DatabaseError) {
                 loading = false
             }
         }
-
+        
         notificationsRef.addValueEventListener(listener)
-
+        
         // Cleanup
         onDispose {
             notificationsRef.removeEventListener(listener)
         }
     }
-
+    
     // 친구 요청 수락 처리
     val handleAccept = { notification: Notification ->
         try {
@@ -376,14 +376,14 @@ fun NotificationScreen(
                 "name" to notification.fromUserName,
                 "addedAt" to System.currentTimeMillis()
             )
-
+            
             // 현재 사용자의 친구 목록에 추가
             firestore.collection("users")
                 .document(currentUserId)
                 .collection("friends")
                 .document(notification.fromUserId)
                 .set(friendData)
-
+            
             // 요청한 사용자의 친구 목록에도 추가
             firestore.collection("users")
                 .document(notification.fromUserId)
@@ -393,21 +393,21 @@ fun NotificationScreen(
                     "name" to (auth.currentUser?.displayName ?: auth.currentUser?.email ?: currentUserId),
                     "addedAt" to System.currentTimeMillis()
                 ))
-
+            
             // 친구 요청 삭제
             firestore.collection("users")
                 .document(currentUserId)
                 .collection("friendRequests")
                 .document(notification.fromUserId)
                 .delete()
-
+            
             // Realtime Database에서도 삭제
             FirebaseDatabase.getInstance().reference
                 .child("notifications")
                 .child(currentUserId)
                 .child(notification.id)
                 .removeValue()
-
+            
             // 수락 알림을 요청한 사용자에게 전송
             val acceptNotification = mapOf(
                 "type" to "friend_accepted",
@@ -415,26 +415,26 @@ fun NotificationScreen(
                 "fromUserName" to (auth.currentUser?.displayName ?: auth.currentUser?.email ?: currentUserId),
                 "timestamp" to System.currentTimeMillis()
             )
-
+            
             firestore.collection("users")
                 .document(notification.fromUserId)
                 .collection("notifications")
                 .add(acceptNotification)
-
+            
             // Realtime Database에도 수락 알림 저장
             FirebaseDatabase.getInstance().reference
                 .child("notifications")
                 .child(notification.fromUserId)
                 .push()
                 .setValue(acceptNotification)
-
+            
             android.widget.Toast.makeText(context, "친구 요청을 수락했습니다", android.widget.Toast.LENGTH_SHORT).show()
-
+            
         } catch (e: Exception) {
             android.widget.Toast.makeText(context, "오류가 발생했습니다: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
         }
     }
-
+    
     // 친구 요청 거절 처리
     val handleReject = { notification: Notification ->
         try {
@@ -444,14 +444,14 @@ fun NotificationScreen(
                 .collection("friendRequests")
                 .document(notification.fromUserId)
                 .delete()
-
+            
             // Realtime Database에서도 삭제
             FirebaseDatabase.getInstance().reference
                 .child("notifications")
                 .child(currentUserId)
                 .child(notification.id)
                 .removeValue()
-
+            
             // 거절 알림을 요청한 사용자에게 전송
             val rejectNotification = mapOf(
                 "type" to "friend_rejected",
@@ -459,26 +459,26 @@ fun NotificationScreen(
                 "fromUserName" to (auth.currentUser?.displayName ?: auth.currentUser?.email ?: currentUserId),
                 "timestamp" to System.currentTimeMillis()
             )
-
+            
             firestore.collection("users")
                 .document(notification.fromUserId)
                 .collection("notifications")
                 .add(rejectNotification)
-
+            
             // Realtime Database에도 거절 알림 저장
             FirebaseDatabase.getInstance().reference
                 .child("notifications")
                 .child(notification.fromUserId)
                 .push()
                 .setValue(rejectNotification)
-
+            
             android.widget.Toast.makeText(context, "친구 요청을 거절했습니다", android.widget.Toast.LENGTH_SHORT).show()
-
+            
         } catch (e: Exception) {
             android.widget.Toast.makeText(context, "오류가 발생했습니다: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
         }
     }
-
+    
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -498,7 +498,7 @@ fun NotificationScreen(
                 modifier = Modifier.align(Alignment.CenterStart)
             )
         }
-
+        
         // 알림 목록
         if (loading) {
             Box(
@@ -552,7 +552,7 @@ fun NotificationScreen(
             }
         }
     }
-
+    
     // 다이얼로그 표시
     showDialog?.let { notification ->
         FriendRequestDialog(

@@ -389,8 +389,6 @@ fun ProfileScreen(
         label = "profileTextOffset"
     )
 
-
-
     // Details 우측에서 등장 애니메이션 (화면 크기에 따른 상대적 위치)
     val detailsOffset by animateFloatAsState(
         targetValue = if (showDetails) 0f else (3f+screenWidth.value / 300f),
@@ -871,7 +869,10 @@ fun ProfileScreen(
                             firestore.collection("users").document(currentUserId).collection("groups").document(groupId).set(memberGroupData)
                             
                             // 선택된 친구들에게 그룹 초대 보내기
+                            println("ProfileScreen: Sending group invites to ${selectedFriendIds.size} friends")
                             selectedFriendIds.forEach { friendId ->
+                                println("ProfileScreen: Sending invite to friendId: $friendId")
+                                
                                 val inviteData = mapOf(
                                     "groupId" to groupId,
                                     "groupName" to groupName,
@@ -888,6 +889,12 @@ fun ProfileScreen(
                                     .collection("groupInvites")
                                     .document(groupId)
                                     .set(inviteData)
+                                    .addOnSuccessListener {
+                                        println("ProfileScreen: Group invite saved to Firestore for friendId: $friendId")
+                                    }
+                                    .addOnFailureListener { e ->
+                                        println("ProfileScreen: Failed to save group invite to Firestore for friendId: $friendId, error: ${e.message}")
+                                    }
                                 
                                 // Realtime Database에 알림 저장
                                 val realtimeDb = com.google.firebase.database.FirebaseDatabase.getInstance().reference
@@ -895,8 +902,8 @@ fun ProfileScreen(
                                     "type" to "groupInvite",
                                     "groupId" to groupId,
                                     "groupName" to groupName,
-                                    "inviterId" to currentUserId,
-                                    "inviterName" to (userName.ifBlank { currentUserEmail ?: "Unknown" }),
+                                    "fromUserId" to currentUserId,
+                                    "fromUserName" to (userName.ifBlank { currentUserEmail ?: "Unknown" }),
                                     "timestamp" to com.google.firebase.database.ServerValue.TIMESTAMP
                                 )
                                 
@@ -904,6 +911,12 @@ fun ProfileScreen(
                                     .child(friendId)
                                     .push()
                                     .setValue(notificationData)
+                                    .addOnSuccessListener {
+                                        println("ProfileScreen: Group invite notification saved to Realtime DB for friendId: $friendId")
+                                    }
+                                    .addOnFailureListener { e ->
+                                        println("ProfileScreen: Failed to save group invite notification to Realtime DB for friendId: $friendId, error: ${e.message}")
+                                    }
                             }
                             
                             groupName = ""
@@ -914,7 +927,7 @@ fun ProfileScreen(
                             
                             android.widget.Toast.makeText(
                                 context,
-                                "그룹이 생성되었습니다. 친구들에게 초대를 보냈습니다.",
+                                "그룹이 생성되었습니다.\n친구들에게 초대를 보냈습니다.",
                                 android.widget.Toast.LENGTH_SHORT
                             ).show()
                             

@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -30,6 +31,30 @@ class AuthViewModel : ViewModel() {
                         val user = auth.currentUser
                         _authenticatedUser.value = user
                         Log.d("AuthViewModel", "로그인 성공: ${user?.email}")
+
+                        // Firestore에 계정 정보가 없으면 저장
+                        if (user != null) {
+                            val firestore = FirebaseFirestore.getInstance()
+                            val userDocRef = firestore.collection("users").document(user.uid)
+                            userDocRef.get().addOnSuccessListener { document ->
+                                if (!document.exists()) {
+                                    val userDoc = hashMapOf(
+                                        "email" to (user.email ?: ""),
+                                        "name" to (user.displayName ?: ""),
+                                        "id" to user.uid
+                                    )
+                                    userDocRef.set(userDoc)
+                                        .addOnSuccessListener {
+                                            Log.d("AuthViewModel", "Firestore: 구글 로그인 계정 정보 신규 저장 완료")
+                                        }
+                                        .addOnFailureListener { e ->
+                                            Log.w("AuthViewModel", "Firestore: 구글 로그인 계정 정보 저장 실패: ${e.message}")
+                                        }
+                                } else {
+                                    Log.d("AuthViewModel", "Firestore: 이미 계정 정보가 존재하므로 복제하지 않음")
+                                }
+                            }
+                        }
                     } else {
                         // 인증 실패
                         Log.w("AuthViewModel", "로그인 실패", task.exception)

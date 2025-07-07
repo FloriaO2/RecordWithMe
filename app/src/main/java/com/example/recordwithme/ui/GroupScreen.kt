@@ -95,11 +95,15 @@ fun GroupScreen(navController: NavController) {
             friends.clear()
             friends.addAll(friendsSnapshot.documents.map { it.id })
 
-            // 그룹 목록 가져오기
-            val snapshot = firestore.collection("groups").get().await()
+            // 본인 그룹 목록만 가져오기
+            val userGroupsSnapshot = firestore.collection("users")
+                .document(currentUserId)
+                .collection("groups")
+                .get()
+                .await()
             groups.clear()
-            for (document in snapshot.documents) {
-                val groupId = document.id
+            for (document in userGroupsSnapshot.documents) {
+                val groupId = document.getString("groupId") ?: document.id
                 val groupName = document.getString("name") ?: ""
                 val note = document.getString("note") ?: ""
                 val creator = document.getString("creator") ?: ""
@@ -509,6 +513,9 @@ fun MemberItem(
             if (userDoc.exists()) {
                 memberName = userDoc.getString("name") ?: ""
                 memberEmail = userDoc.getString("email") ?: ""
+                println("MemberItem: $memberId -> email: $memberEmail, name: $memberName")
+            } else {
+                println("MemberItem: $memberId -> userDoc does not exist")
             }
         } catch (e: Exception) {
             println("Error fetching user info: $e")
@@ -538,7 +545,7 @@ fun MemberItem(
             )
         } else {
             val displayText = when {
-                memberEmail.endsWith("@recordwith.me") && memberName.isNotEmpty() -> memberName
+                memberEmail.endsWith("@recordwith.me") -> memberEmail.removeSuffix("@recordwith.me")
                 memberEmail.isNotEmpty() -> memberEmail
                 else -> memberId
             }

@@ -63,11 +63,13 @@ import java.util.Locale
 // 알림 데이터 클래스
 data class Notification(
     val id: String,
-    val type: String, // "friend_request", "friend_accepted", "friend_rejected"
+    val type: String, // "friend_request", "friend_accepted", "friend_rejected", "groupInvite"
     val fromUserId: String,
     val fromUserName: String,
     val timestamp: Long,
-    val isRead: Boolean = false
+    val isRead: Boolean = false,
+    val groupId: String? = null,
+    val groupName: String? = null
 ) {
     val formattedTime: String
         get() {
@@ -133,6 +135,109 @@ fun FriendRequestItem(
                     )
                     Text(
                         text = "친구 요청을 보냈습니다",
+                        fontSize = 14.sp,
+                        color = Color.Gray
+                    )
+                    Text(
+                        text = notification.formattedTime,
+                        fontSize = 12.sp,
+                        color = Color.Gray
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // 수락/거절 버튼
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = { onAccept(notification) },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF4CAF50)
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Icon(
+                        Icons.Filled.Check,
+                        contentDescription = "Accept",
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("수락")
+                }
+                
+                OutlinedButton(
+                    onClick = { onReject(notification) },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp),
+                    border = BorderStroke(1.dp, Color.Gray)
+                ) {
+                    Icon(
+                        Icons.Filled.Close,
+                        contentDescription = "Reject",
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("거절")
+                }
+            }
+        }
+    }
+}
+
+// 그룹 초대 아이템 컴포저블
+@Composable
+fun GroupInviteItem(
+    notification: Notification,
+    onAccept: (Notification) -> Unit,
+    onReject: (Notification) -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        shape = RoundedCornerShape(12.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFFFEFEFE)
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // 프로필 이미지 (이니셜)
+                Box(
+                    modifier = Modifier
+                        .size(50.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFBDBDBD)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = notification.fromUserName.firstOrNull()?.uppercaseChar()?.toString() ?: "U",
+                        color = Color.White,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                
+                Spacer(modifier = Modifier.width(12.dp))
+                
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = notification.fromUserName,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        text = "${notification.groupName ?: "그룹"}에 초대했습니다",
                         fontSize = 14.sp,
                         color = Color.Gray
                     )
@@ -319,13 +424,18 @@ fun NotificationScreen(
                     val fromUserName = childSnapshot.child("fromUserName").getValue(String::class.java) ?: continue
                     val timestamp = childSnapshot.child("timestamp").getValue(Long::class.java) ?: continue
                     
+                    val groupId = childSnapshot.child("groupId").getValue(String::class.java)
+                    val groupName = childSnapshot.child("groupName").getValue(String::class.java)
+                    
                     newNotifications.add(
                         Notification(
                             id = childSnapshot.key ?: "",
                             type = type,
                             fromUserId = fromUserId,
                             fromUserName = fromUserName,
-                            timestamp = timestamp
+                            timestamp = timestamp,
+                            groupId = groupId,
+                            groupName = groupName
                         )
                     )
                 }
@@ -486,6 +596,118 @@ fun NotificationScreen(
         }
     }
     
+    // 그룹 초대 수락 처리
+    val handleGroupInviteAccept: (Notification) -> Unit = { notification ->
+        val groupId = notification.groupId
+        val groupName = notification.groupName ?: "그룹"
+        
+        if (groupId == null) {
+            android.widget.Toast.makeText(context, "그룹 정보를 찾을 수 없습니다", android.widget.Toast.LENGTH_SHORT).show()
+        } else {
+            
+            // 그룹 정보 가져오기
+            firestore.collection("groups").document(groupId).get()
+                .addOnSuccessListener { groupDoc ->
+                    if (groupDoc.exists()) {
+                        val currentMembers = groupDoc.get("members") as? List<String> ?: emptyList()
+                        val updatedMembers = currentMembers + currentUserId
+                        
+                        // 그룹 멤버 목록 업데이트
+                        firestore.collection("groups").document(groupId)
+                            .update("members", updatedMembers)
+                        
+                        // 현재 사용자의 그룹 목록에 추가
+                        val groupData = groupDoc.data?.toMutableMap() ?: mutableMapOf()
+                        groupData["groupId"] = groupId
+                        firestore.collection("users")
+                            .document(currentUserId)
+                            .collection("groups")
+                            .document(groupId)
+                            .set(groupData)
+                        
+                        // 그룹 초대 삭제
+                        firestore.collection("users")
+                            .document(currentUserId)
+                            .collection("groupInvites")
+                            .document(groupId)
+                            .delete()
+                        
+                        // Realtime Database에서도 삭제
+                        FirebaseDatabase.getInstance().reference
+                            .child("notifications")
+                            .child(currentUserId)
+                            .child(notification.id)
+                            .removeValue()
+                        
+                        // 초대한 사용자에게 수락 알림 전송
+                        val acceptNotification = mapOf(
+                            "type" to "groupInviteAccepted",
+                            "fromUserId" to currentUserId,
+                            "fromUserName" to (auth.currentUser?.displayName ?: auth.currentUser?.email ?: currentUserId),
+                            "groupId" to groupId,
+                            "groupName" to groupName,
+                            "timestamp" to System.currentTimeMillis()
+                        )
+                        
+                        firestore.collection("users")
+                            .document(notification.fromUserId)
+                            .collection("notifications")
+                            .add(acceptNotification)
+                        
+                        android.widget.Toast.makeText(context, "$groupName 그룹에 참여했습니다", android.widget.Toast.LENGTH_SHORT).show()
+                        
+                    } else {
+                        android.widget.Toast.makeText(context, "그룹을 찾을 수 없습니다", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }
+                .addOnFailureListener { e ->
+                    android.widget.Toast.makeText(context, "오류가 발생했습니다: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                }
+        }
+    }
+    
+    // 그룹 초대 거절 처리
+    val handleGroupInviteReject: (Notification) -> Unit = { notification ->
+        val groupId = notification.groupId
+        val groupName = notification.groupName ?: "그룹"
+        
+        if (groupId == null) {
+            android.widget.Toast.makeText(context, "그룹 정보를 찾을 수 없습니다", android.widget.Toast.LENGTH_SHORT).show()
+        } else {
+            
+            // 그룹 초대 삭제
+            firestore.collection("users")
+                .document(currentUserId)
+                .collection("groupInvites")
+                .document(groupId)
+                .delete()
+            
+            // Realtime Database에서도 삭제
+            FirebaseDatabase.getInstance().reference
+                .child("notifications")
+                .child(currentUserId)
+                .child(notification.id)
+                .removeValue()
+            
+            // 초대한 사용자에게 거절 알림 전송
+            val rejectNotification = mapOf(
+                "type" to "groupInviteRejected",
+                "fromUserId" to currentUserId,
+                "fromUserName" to (auth.currentUser?.displayName ?: auth.currentUser?.email ?: currentUserId),
+                "groupId" to groupId,
+                "groupName" to groupName,
+                "timestamp" to System.currentTimeMillis()
+            )
+            
+            firestore.collection("users")
+                .document(notification.fromUserId)
+                .collection("notifications")
+                .add(rejectNotification)
+            
+            android.widget.Toast.makeText(context, "$groupName 그룹 초대를 거절했습니다", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+    
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -549,6 +771,13 @@ fun NotificationScreen(
                                 notification = notification,
                                 onAccept = handleAccept,
                                 onReject = handleReject
+                            )
+                        }
+                        "groupInvite" -> {
+                            GroupInviteItem(
+                                notification = notification,
+                                onAccept = handleGroupInviteAccept,
+                                onReject = handleGroupInviteReject
                             )
                         }
                         else -> {

@@ -58,6 +58,8 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import kotlinx.coroutines.tasks.await
 import java.util.*
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 data class Photo(val url: String, val date: String, val isBase64: Boolean = false)
 data class Group(
@@ -294,9 +296,16 @@ fun HomeScreen() {
                     Text("가장 먼저 사진을 업로드해보세요!", color = Color.Gray)
                 }
             } else {
+                val dateFormatter = DateTimeFormatter.ofPattern("yyyy년 M월 d일", Locale.KOREAN)
                 val photosByDate = photosToShow.groupBy { it.date }
                     .toList()
-                    .sortedByDescending { it.first } // 날짜 내림차순 정렬
+                    .sortedByDescending { (dateStr, _) ->
+                        try {
+                            LocalDate.parse(dateStr, dateFormatter)
+                        } catch (e: Exception) {
+                            LocalDate.MIN
+                        }
+                    }
                 val representativePhoto = photosToShow.firstOrNull()
                 LazyColumn(
                     modifier = Modifier

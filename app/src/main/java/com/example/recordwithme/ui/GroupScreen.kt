@@ -1,6 +1,7 @@
 package com.example.recordwithme.ui
 
 import android.content.Intent
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -17,22 +18,28 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -51,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 
@@ -67,6 +75,7 @@ data class UserGroup(
 @Composable
 fun GroupScreen(navController: NavController) {
     val firestore = FirebaseFirestore.getInstance()
+    val context = LocalContext.current
     val groups = remember { mutableStateListOf<UserGroup>() }
     val isLoading = remember { mutableStateOf(true) }
     val friends = remember { mutableStateListOf<String>() }
@@ -85,7 +94,7 @@ fun GroupScreen(navController: NavController) {
             // 현재 사용자 ID 가져오기
             val auth = FirebaseAuth.getInstance()
             val currentUserId = auth.currentUser?.uid ?: return@LaunchedEffect
-
+            
             // 친구 목록 가져오기
             val friendsSnapshot = firestore.collection("users")
                 .document(currentUserId)
@@ -94,7 +103,7 @@ fun GroupScreen(navController: NavController) {
                 .await()
             friends.clear()
             friends.addAll(friendsSnapshot.documents.map { it.id })
-
+            
             // 본인 그룹 목록만 가져오기
             val userGroupsSnapshot = firestore.collection("users")
                 .document(currentUserId)
@@ -127,29 +136,31 @@ fun GroupScreen(navController: NavController) {
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.White)
                 .padding((screenWidth.value * 0.06f).dp)
         ) {
-            Spacer(modifier = Modifier.width((screenWidth.value * 0.04f).dp))
+            item {
+                Spacer(modifier = Modifier.width((screenWidth.value * 0.04f).dp))
             Text(
                 text = "My Groups",
-                style = TextStyle(
-                    fontSize = (screenWidth.value * 0.06f).sp,
-                    fontWeight = FontWeight.Bold
-                ),
-                modifier = Modifier.padding(bottom = (screenHeight.value * 0.02f).dp)
-            )
-
+                    style = TextStyle(
+                        fontSize = (screenWidth.value * 0.06f).sp,
+                        fontWeight = FontWeight.Bold
+                    ),
+                    modifier = Modifier.padding(bottom = (screenHeight.value * 0.02f).dp)
+                )
+            }
             if (isLoading.value) {
-                Text(text = "Loading...")
+                item { Text(text = "Loading...") }
             } else {
                 if (groups.isEmpty()) {
-                    Spacer(modifier = Modifier.padding((screenHeight.value * 0.02f).dp))
+                    item {
+                        Spacer(modifier = Modifier.padding((screenHeight.value * 0.02f).dp))
                     Column(
-                        verticalArrangement = Arrangement.spacedBy((screenHeight.value * 0.005f).dp)
+                            verticalArrangement = Arrangement.spacedBy((screenHeight.value * 0.005f).dp)
                     ) {
                         Text(
                             text = "그룹이 없습니다.",
@@ -158,7 +169,7 @@ fun GroupScreen(navController: NavController) {
                                 lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * 0.5f
                             )
                         )
-                        Spacer(modifier = Modifier.height((screenHeight.value * 0.002f).dp))
+                            Spacer(modifier = Modifier.height((screenHeight.value * 0.002f).dp))
                         Row(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -169,8 +180,8 @@ fun GroupScreen(navController: NavController) {
                                     lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * 0.5f
                                 )
                             )
-                            Spacer(modifier = Modifier.padding((screenWidth.value * 0.01f).dp))
-                            Text(
+                                Spacer(modifier = Modifier.padding((screenWidth.value * 0.01f).dp))
+                    Text(
                                 text = "그룹 만들기",
                                 style = MaterialTheme.typography.bodyMedium.copy(
                                     color = MaterialTheme.colorScheme.primary,
@@ -191,10 +202,11 @@ fun GroupScreen(navController: NavController) {
                                     }
                                 }
                             )
+                            }
                         }
                     }
                 } else {
-                    groups.forEach { group ->
+                    items(groups) { group ->
                         GroupItem(
                             group = group,
                             isExpanded = selectedGroupId == group.id,
@@ -202,10 +214,84 @@ fun GroupScreen(navController: NavController) {
                                 selectedGroupId = if (selectedGroupId == group.id) null else group.id
                             },
                             onDeleteGroup = { groupToDelete ->
-                                firestore.collection("groups").document(groupToDelete.id).delete()
-                                groups.remove(groupToDelete)
-                                if (selectedGroupId == groupToDelete.id) {
-                                    selectedGroupId = null
+                                val groupDocRef = FirebaseFirestore.getInstance().collection("groups").document(groupToDelete.id)
+                                groupDocRef.get().addOnSuccessListener { doc ->
+                                    val members = doc.get("members") as? List<String> ?: groupToDelete.members
+                                    for (memberId in members) {
+                                        FirebaseFirestore.getInstance().collection("users")
+                                            .document(memberId)
+                                            .collection("groups")
+                                            .document(groupToDelete.id)
+                                            .delete()
+                                            .addOnSuccessListener {
+                                                android.util.Log.i("GroupDelete", "Deleted for user $memberId")
+                                                android.widget.Toast.makeText(
+                                                    context,
+                                                    "${groupToDelete.name} 그룹 삭제 완료",
+                                                    android.widget.Toast.LENGTH_SHORT
+                                                ).show()
+                                            }
+                                            .addOnFailureListener { e ->
+                                                android.util.Log.e("GroupDelete", "Failed to delete for user $memberId: ${e.message}")
+                                                android.widget.Toast.makeText(
+                                                    context,
+                                                    "[$memberId]의 groups에서 삭제 실패: ${e.message}",
+                                                    android.widget.Toast.LENGTH_LONG
+                                                ).show()
+                                            }
+                                    }
+                                    FirebaseFirestore.getInstance().collection("groups").document(groupToDelete.id)
+                                        .delete()
+                                        .addOnSuccessListener {
+                                            android.util.Log.i("GroupDelete", "그룹 문서 삭제 성공")
+                                            android.widget.Toast.makeText(
+                                                context,
+                                                "그룹 문서 삭제 성공",
+                                                android.widget.Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                        .addOnFailureListener { e ->
+                                            android.util.Log.e("GroupDelete", "그룹 문서 삭제 실패: ${e.message}")
+                                            android.widget.Toast.makeText(
+                                                context,
+                                                "그룹 문서 삭제 실패: ${e.message}",
+                                                android.widget.Toast.LENGTH_LONG
+                                            ).show()
+                                        }
+                                    groups.remove(groupToDelete)
+                                    if (selectedGroupId == groupToDelete.id) {
+                                        selectedGroupId = null
+                                    }
+                                }.addOnFailureListener { e ->
+                                    android.util.Log.e("GroupDelete", "Failed to fetch group doc: ${e.message}")
+                                    android.widget.Toast.makeText(
+                                        context,
+                                        "그룹 정보 조회 실패: ${e.message}",
+                                        android.widget.Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            },
+                            onLeaveGroup = { groupToLeave ->
+                                val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+                                if (currentUserId != null) {
+                                    // 본인만 users/{myId}/groups/{groupId} 삭제
+                                    FirebaseFirestore.getInstance().collection("users")
+                                        .document(currentUserId)
+                                        .collection("groups")
+                                        .document(groupToLeave.id)
+                                        .delete()
+                                    // groups/{groupId}의 members에서 본인 id만 제거
+                                    val groupDocRef = FirebaseFirestore.getInstance().collection("groups").document(groupToLeave.id)
+                                    groupDocRef.get().addOnSuccessListener { doc ->
+                                        val members = (doc.get("members") as? List<String>)?.toMutableList() ?: groupToLeave.members.toMutableList()
+                                        members.remove(currentUserId)
+                                        FirebaseFirestore.getInstance().collection("groups").document(groupToLeave.id)
+                                            .update("members", members)
+                                    }
+                                    if (selectedGroupId == groupToLeave.id) {
+                                        selectedGroupId = null
+                                    }
+                                    groups.removeAll { it.id == groupToLeave.id }
                                 }
                             },
                             screenWidth = screenWidth,
@@ -215,13 +301,12 @@ fun GroupScreen(navController: NavController) {
                     }
                 }
             }
-
-            Spacer(modifier = Modifier.weight(1f))
+            item { Spacer(modifier = Modifier.height((screenHeight.value * 0.05f).dp)) }
         }
 
         // FloatingActionButton
         FloatingActionButton(
-            onClick = {
+            onClick = { 
                 if (friends.isEmpty()) {
                     GroupModeState.isGroupMode = true
                     navController.navigate("profile") {
@@ -253,10 +338,28 @@ fun GroupItem(
     isExpanded: Boolean,
     onClick: () -> Unit,
     onDeleteGroup: (UserGroup) -> Unit,
+    onLeaveGroup: (UserGroup) -> Unit,
     screenWidth: androidx.compose.ui.unit.Dp,
     screenHeight: androidx.compose.ui.unit.Dp,
     navController: NavController
 ) {
+    val firestore = FirebaseFirestore.getInstance()
+    val groupId = group.id
+
+    var membersCount by remember { mutableStateOf(group.membersCount) }
+
+    // 실시간 구독
+    DisposableEffect(groupId) {
+        val listener = FirebaseFirestore.getInstance().collection("groups").document(groupId)
+            .addSnapshotListener { snapshot, _ ->
+                if (snapshot != null && snapshot.exists()) {
+                    val newMembers = snapshot.get("members") as? List<String> ?: emptyList()
+                    membersCount = newMembers.size
+                }
+            }
+        onDispose { listener.remove() }
+    }
+
     val configuration = LocalConfiguration.current
     val localScreenWidth = configuration.screenWidthDp.dp
     val localScreenHeight = configuration.screenHeightDp.dp
@@ -298,7 +401,7 @@ fun GroupItem(
                         color = if (isExpanded) MaterialTheme.colorScheme.primary else Color.Black
                     )
                     Text(
-                        text = "${group.membersCount} members",
+                        text = "${membersCount} members",
                         style = MaterialTheme.typography.bodyMedium.copy(
                             color = if (isExpanded) MaterialTheme.colorScheme.primary.copy(alpha = 0.7f) else Color.Gray,
                             fontSize = (localScreenWidth.value * 0.035f).sp
@@ -312,6 +415,7 @@ fun GroupItem(
                 GroupDetailPanel(
                     group = group,
                     onDeleteGroup = onDeleteGroup,
+                    onLeaveGroup = onLeaveGroup,
                     screenWidth = screenWidth,
                     screenHeight = screenHeight,
                     isExpanded = isExpanded,
@@ -322,34 +426,93 @@ fun GroupItem(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GroupDetailPanel(
     group: UserGroup,
     onDeleteGroup: (UserGroup) -> Unit,
+    onLeaveGroup: (UserGroup) -> Unit,
     screenWidth: androidx.compose.ui.unit.Dp,
     screenHeight: androidx.compose.ui.unit.Dp,
     isExpanded: Boolean,
     navController: NavController
 ) {
+    val firestore = FirebaseFirestore.getInstance()
+    val groupId = group.id
+    val context = LocalContext.current
+    val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+    val isCreator = group.creator == currentUserId
+
+    // 멤버 추가 다이얼로그 상태
+    var showAddMemberDialog by remember { mutableStateOf(false) }
+    var friends by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) } // (id, name)
+    var selectedFriends by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var loadingFriends by remember { mutableStateOf(false) }
+
+    // 멤버 추가 버튼 클릭 시 친구 목록 불러오기
+    fun loadFriendsNotInGroup() {
+        loadingFriends = true
+        if (currentUserId == null) return
+        FirebaseFirestore.getInstance().collection("users").document(currentUserId).collection("friends").get()
+            .addOnSuccessListener { snapshot ->
+                val allFriends = snapshot.documents.map { it.id to (it.getString("name") ?: it.id) }
+                // 그룹에 없는 친구만 필터링
+                val notInGroup = allFriends.filter { (id, _) -> id !in group.members }
+                friends = notInGroup
+                loadingFriends = false
+            }
+            .addOnFailureListener {
+                friends = emptyList()
+                loadingFriends = false
+            }
+    }
+
     val panelHeight by animateFloatAsState(
         targetValue = 1f,
         animationSpec = tween(300),
         label = "panelHeight"
     )
 
-    val context = LocalContext.current
+    var members by remember { mutableStateOf(group.members) }
+    var membersCount by remember { mutableStateOf(group.membersCount) }
 
-    // 상세정보 컨텐츠
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(
-                start = (screenWidth.value * 0.02f).dp,
-                end = (screenWidth.value * 0.02f).dp,
-                top = (screenHeight.value * 0f).dp,
-                bottom = (screenHeight.value * 0.005f).dp
-            )
-    ) {
+    // 실시간 구독
+    DisposableEffect(groupId) {
+        val listener = FirebaseFirestore.getInstance().collection("groups").document(groupId)
+            .addSnapshotListener { snapshot, _ ->
+                if (snapshot != null && snapshot.exists()) {
+                    val newMembers = snapshot.get("members") as? List<String> ?: emptyList()
+                    members = newMembers
+                    membersCount = newMembers.size
+                }
+            }
+        onDispose { listener.remove() }
+    }
+
+    var showDeleteDialog by remember { mutableStateOf(false) }
+
+    // 상세정보 컨텐츠 (verticalScroll 제거)
+    val targetWidth = if (isExpanded) screenWidth * 0.95f else 0.dp
+    val animatedWidth by animateDpAsState(
+        targetValue = targetWidth,
+        animationSpec = tween(durationMillis = 500), label = "panelWidth"
+    )
+
+    if (animatedWidth > 1.dp) {
+        Box(
+            modifier = Modifier
+                .width(animatedWidth)
+                .clip(RoundedCornerShape(0.dp))
+                .padding(
+                    start = (screenWidth.value * 0.02f).dp,
+                    end = (screenWidth.value * 0.02f).dp,
+                    top = (screenHeight.value * 0f).dp,
+                    bottom = (screenHeight.value * 0.005f).dp
+                )
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 // 메모
                 if (group.note.isNotEmpty()) {
                     Text(
@@ -358,7 +521,7 @@ fun GroupDetailPanel(
                             fontSize = (screenWidth.value * 0.04f).sp,
                             fontWeight = FontWeight.SemiBold
                         ),
-                        modifier = Modifier.padding(bottom = (screenHeight.value * 0.01f).dp)
+                        modifier = Modifier.padding(bottom = (screenHeight.value * 0.03f).dp)
                     )
                     Text(
                         text = group.note,
@@ -373,38 +536,42 @@ fun GroupDetailPanel(
                 // 멤버 정보
                 Row(
                     modifier = Modifier
-                        .fillMaxWidth(),
+                        .fillMaxWidth()
+                        .padding(start = (screenWidth.value * 0.035f).dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "멤버 (${group.membersCount}명)",
+                        text = "멤버 (${membersCount}명)",
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontSize = (screenWidth.value * 0.04f).sp,
                             fontWeight = FontWeight.SemiBold
                         )
                     )
-
                     TextButton(
-                        onClick = { /* 멤버 추가 기능 */ },
+                        onClick = {
+                            loadFriendsNotInGroup()
+                            showAddMemberDialog = true
+                        },
                         contentPadding = PaddingValues(0.dp),
-                        modifier = Modifier.padding(end = (screenWidth.value * 0.03f).dp)  // 오른쪽 여백 추가로 더 왼쪽으로 이동
+                        modifier = Modifier.padding(end = (screenWidth.value * 0.035f).dp)
                     ) {
                         Text(
                             text = "멤버 추가하기",
-                            style = MaterialTheme.typography.bodySmall.copy(
+                            style = MaterialTheme.typography.bodyMedium.copy(
                                 fontSize = (screenWidth.value * 0.03f).sp,
-                                color = Color.Gray  // 회색으로 변경
+                                color = Color.Gray
                             )
                         )
                     }
                 }
 
-                                // 멤버 목록 (사용자 정보 표시)
+                // 멤버 목록 (사용자 정보 표시)
                 Column(
-                    verticalArrangement = Arrangement.spacedBy((screenHeight.value * 0.003f).dp)
+                    verticalArrangement = Arrangement.spacedBy((screenHeight.value * 0.003f).dp),
+                            modifier = Modifier.padding(start = (screenWidth.value * 0.02f).dp)
                 ) {
-                    group.members.take(5).forEach { memberId ->
+                    members.take(5).forEach { memberId ->
                         MemberItem(
                             memberId = memberId,
                             screenWidth = screenWidth,
@@ -412,9 +579,9 @@ fun GroupDetailPanel(
                         )
                     }
 
-                    if (group.members.size > 5) {
+                    if (members.size > 5) {
                         Text(
-                            text = "... 외 ${group.members.size - 5}명",
+                            text = "... 외 ${members.size - 5}명",
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 fontSize = (screenWidth.value * 0.035f).sp,
                                 color = Color.Gray
@@ -449,23 +616,42 @@ fun GroupDetailPanel(
                             color = MaterialTheme.colorScheme.primary
                         )
                     }
-
-                    TextButton(
-                        onClick = { onDeleteGroup(group) },
-                        modifier = Modifier.align(Alignment.Start)
-                    ) {
-                        Icon(
-                            Icons.Filled.Delete,
-                            contentDescription = "Delete",
-                            modifier = Modifier.size((screenWidth.value * 0.04f).dp),
-                            tint = Color.Red
-                        )
-                        Spacer(modifier = Modifier.width((screenWidth.value * 0.02f).dp))
-                        Text(
-                            text = "삭제",
-                            fontSize = (screenWidth.value * 0.035f).sp,
-                            color = Color.Red
-                        )
+                    if (isCreator) {
+                        TextButton(
+                            onClick = { showDeleteDialog = true },
+                            modifier = Modifier.align(Alignment.Start)
+                        ) {
+                            Icon(
+                                Icons.Filled.Delete,
+                                contentDescription = "Delete",
+                                modifier = Modifier.size((screenWidth.value * 0.04f).dp),
+                                tint = Color.Red
+                            )
+                            Spacer(modifier = Modifier.width((screenWidth.value * 0.02f).dp))
+                            Text(
+                                text = "삭제",
+                                fontSize = (screenWidth.value * 0.035f).sp,
+                                color = Color.Red
+                            )
+                        }
+                    } else {
+                        TextButton(
+                            onClick = { onLeaveGroup(group) },
+                            modifier = Modifier.align(Alignment.Start)
+                        ) {
+                            Icon(
+                                Icons.Filled.Delete,
+                                contentDescription = "Leave",
+                                modifier = Modifier.size((screenWidth.value * 0.04f).dp),
+                                tint = Color.Red
+                            )
+                            Spacer(modifier = Modifier.width((screenWidth.value * 0.02f).dp))
+                            Text(
+                                text = "탈퇴",
+                                fontSize = (screenWidth.value * 0.035f).sp,
+                                color = Color.Red
+                            )
+                        }
                     }
 
                     TextButton(
@@ -492,7 +678,126 @@ fun GroupDetailPanel(
                 }
             }
         }
+    }
 
+    // 멤버 추가 다이얼로그
+    if (showAddMemberDialog) {
+        AlertDialog(
+            onDismissRequest = { showAddMemberDialog = false },
+            title = { Text("그룹에 초대할 친구 선택") },
+            text = {
+                if (loadingFriends) {
+                    Text("불러오는 중...")
+                } else if (friends.isEmpty()) {
+                    Text("추가할 수 있는 친구가 없습니다.")
+                } else {
+                    Column {
+                        friends.forEach { (id, name) ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Checkbox(
+                                    checked = selectedFriends.contains(id),
+                                    onCheckedChange = { checked ->
+                                        selectedFriends = if (checked) selectedFriends + id else selectedFriends - id
+                                    }
+                                )
+                                // @recordwith.me면 name(있을 때만), 아니면 이메일 전체
+                                val isRecordWithMe = id.endsWith("@recordwith.me")
+                                val displayText = if (isRecordWithMe && name.isNotEmpty()) {
+                                    name
+                                } else {
+                                    id
+                                }
+                                Text(text = displayText)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        // 그룹 초대 로직 (프로필과 동일)
+                        val groupName = group.name
+                        val groupNote = group.note
+                        val groupCreator = group.creator
+                        val groupMembers = group.members
+                        val groupId = group.id
+                        val groupData = mapOf(
+                            "groupId" to groupId,
+                            "name" to groupName,
+                            "note" to groupNote,
+                            "creator" to groupCreator,
+                            "members" to groupMembers
+                        )
+                        selectedFriends.forEach { friendId ->
+                            // Firestore groupInvites
+                            FirebaseFirestore.getInstance().collection("users")
+                                .document(friendId)
+                                .collection("groupInvites")
+                                .document(groupId)
+                                .set(groupData)
+                            // 알림 전송 (Firestore)
+                            val inviteNotification = mapOf(
+                                "type" to "groupInvite",
+                                "fromUserId" to (currentUserId ?: ""),
+                                "fromUserName" to (FirebaseAuth.getInstance().currentUser?.displayName ?: FirebaseAuth.getInstance().currentUser?.email ?: currentUserId ?: ""),
+                                "groupId" to groupId,
+                                "groupName" to groupName,
+                                "timestamp" to System.currentTimeMillis()
+                            )
+                            FirebaseFirestore.getInstance().collection("users")
+                                .document(friendId)
+                                .collection("notifications")
+                                .add(inviteNotification)
+                            // 알림 전송 (Realtime DB)
+                            val ref = FirebaseDatabase.getInstance().reference
+                                .child("notifications")
+                                .child(friendId)
+                                .push()
+                            val notificationId = ref.key ?: ""
+                            val inviteNotificationWithId = inviteNotification.toMutableMap()
+                            inviteNotificationWithId["id"] = notificationId
+                            ref.setValue(inviteNotificationWithId)
+                        }
+                        showAddMemberDialog = false
+                        selectedFriends = emptySet()
+                        android.widget.Toast.makeText(context, "초대가 전송되었습니다", android.widget.Toast.LENGTH_SHORT).show()
+                    },
+                    enabled = selectedFriends.isNotEmpty()
+                ) {
+                    Text("그룹 초대하기")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showAddMemberDialog = false }) {
+                    Text("취소")
+                }
+            }
+        )
+    }
+
+    // 삭제 확인 다이얼로그
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("정말로 삭제하시겠습니까?") },
+            text = { Text("그룹을 삭제하면 모든 멤버가 그룹을 사용할 수 없습니다.\n삭제된 그룹은 복구할 수 없습니다.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteDialog = false
+                    onDeleteGroup(group)
+                }) {
+                    Text("삭제")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("취소")
+                }
+            }
+        )
+    }
+}
 
 @Composable
 fun MemberItem(
@@ -507,7 +812,7 @@ fun MemberItem(
     // Firestore에서 사용자 정보 가져오기
     LaunchedEffect(memberId) {
         try {
-            val firestore = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+            val firestore = FirebaseFirestore.getInstance()
             val userDoc = firestore.collection("users").document(memberId).get().await()
 
             if (userDoc.exists()) {
@@ -544,8 +849,9 @@ fun MemberItem(
                 )
             )
         } else {
+            val isRecordWithMe = memberEmail.endsWith("@recordwith.me")
             val displayText = when {
-                memberEmail.endsWith("@recordwith.me") -> memberEmail.removeSuffix("@recordwith.me")
+                isRecordWithMe && memberName.isNotEmpty() -> memberName
                 memberEmail.isNotEmpty() -> memberEmail
                 else -> memberId
             }

@@ -1,7 +1,11 @@
 package com.example.recordwithme.ui
 
+import android.app.AlertDialog
+import android.content.Intent
 import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.graphics.Rect
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.util.Base64
@@ -9,28 +13,21 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
-import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import android.graphics.Rect
-import android.widget.EditText
+import com.google.firebase.Timestamp
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-import com.google.firebase.auth.FirebaseAuth
-import android.app.AlertDialog
-import android.content.Intent
-import android.net.Uri
-import com.google.firebase.storage.FirebaseStorage
-import java.util.UUID
 import java.io.InputStream
-import com.google.firebase.Timestamp
 
 // 사진 데이터 클래스
 data class Comment(
@@ -204,7 +201,7 @@ class PhotoAdapter(
         holder.commentsView.removeAllViews()
         if (photo.comments.isEmpty()) {
             val emptyView = TextView(holder.commentsView.context).apply {
-                text = "댓글이 없습니다"
+                text = "댓글이 없습니다."
                 setTextColor(Color.LTGRAY)
                 textSize = 12f
             }

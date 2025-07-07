@@ -32,6 +32,7 @@ import com.google.firebase.auth.ktx.auth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.ktx.Firebase
 import androidx.compose.ui.Alignment
+import android.view.View
 
 class MainActivity : ComponentActivity() {
     private lateinit var googleSignInClient: GoogleSignInClient
@@ -55,7 +56,7 @@ class MainActivity : ComponentActivity() {
         }
 
         // 시스템 UI 설정
-        enableEdgeToEdge()
+        WindowCompat.setDecorFitsSystemWindows(window, true)
 
         setContent {
             val navController = rememberNavController()
@@ -209,16 +210,6 @@ class MainActivity : ComponentActivity() {
     private fun signIn() {
         val signInIntent = googleSignInClient.signInIntent
         googleSignInLauncher.launch(signInIntent)
-    }
-
-    private fun enableEdgeToEdge() {
-        WindowCompat.setDecorFitsSystemWindows(window, false)
-        window.statusBarColor = android.graphics.Color.TRANSPARENT
-        window.navigationBarColor = android.graphics.Color.TRANSPARENT
-
-        val wic = WindowInsetsControllerCompat(window, window.decorView)
-        wic.isAppearanceLightStatusBars = true
-        wic.isAppearanceLightNavigationBars = true
     }
 
     private val googleSignInLauncher = registerForActivityResult(

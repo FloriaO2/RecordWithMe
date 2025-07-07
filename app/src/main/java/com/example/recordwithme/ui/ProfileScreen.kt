@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -294,6 +295,15 @@ object GroupModeState {
     var isGroupMode by mutableStateOf(false)
 }
 
+// Helper function for display email
+fun getDisplayEmail(email: String?): String {
+    return if (email != null && email.endsWith("@recordwith.me")) {
+        email.removeSuffix("@recordwith.me")
+    } else {
+        email ?: ""
+    }
+}
+
 // 최종 ProfileScreen 컴포저블
 @Composable
 fun ProfileScreen(
@@ -474,22 +484,24 @@ fun ProfileScreen(
                         // 좌측: 프로필 이미지 (중앙에서 좌측으로 이동)
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.offset(
-                                x = with(LocalDensity.current) { 
-                                    (profileImageOffset * 1200).toDp()
-                                },
-                                y = with(LocalDensity.current) { 
-                                    profileImageVerticalOffset.toDp()
-                                }
-                            )
-                        ) {
-                                                    Box(
                             modifier = Modifier
-                                .size(profileImageSize)
-                                .clip(CircleShape)
-                                .background(Color(0xFFE0E0E0)),
-                            contentAlignment = Alignment.Center
+                                .padding(start = (screenWidth.value * 0.00f).dp)
+                                .offset(
+                                    x = with(LocalDensity.current) { 
+                                        (profileImageOffset * 1200).toDp()
+                                    },
+                                    y = with(LocalDensity.current) { 
+                                        profileImageVerticalOffset.toDp()
+                                    }
+                                )
                         ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(profileImageSize)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFFE0E0E0)),
+                                contentAlignment = Alignment.Center
+                            ) {
                                 val displayText = when {
                                     userName.isNotEmpty() -> userName.first().uppercaseChar().toString()
                                     userDisplayId.isNotEmpty() -> userDisplayId.first().uppercaseChar().toString()
@@ -497,12 +509,12 @@ fun ProfileScreen(
                                     else -> "U"
                                 }
 
-                                                            Text(
-                                text = displayText,
-                                fontSize = (profileImageSize.value * 0.35).sp,
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold
-                            )
+                                Text(
+                                    text = displayText,
+                                    fontSize = (profileImageSize.value * 0.35).sp,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
                         }
 
@@ -517,24 +529,18 @@ fun ProfileScreen(
                         ) {
                             Spacer(modifier = Modifier.height(profileImageSize + (screenHeight.value * 0.025f).dp)) // 이미지 높이 + 간격
 
-                            val displayName = when {
-                                userName.isNotEmpty() -> userName
-                                userDisplayId.isNotEmpty() -> userDisplayId
-                                currentUserEmail?.isNotEmpty() == true -> currentUserEmail
-                                else -> currentUserId
-                            }
-
-                            Text(displayName, fontSize = (screenWidth.value * 0.055f).sp, fontWeight = FontWeight.Bold)
-                            if (userDisplayId.isNotEmpty()) {
-                                Text("@$userDisplayId", fontSize = (screenWidth.value * 0.04f).sp, color = Color.Gray)
-                            }
+                            val displayEmail = getDisplayEmail(currentUserEmail)
+                            Text(displayEmail, fontSize = (screenWidth.value * 0.055f).sp, fontWeight = FontWeight.Bold)
                         }
 
                         // 우측: 상세 정보 (화면 바깥에서 들어옴)
                         Column(
                             modifier = Modifier
                                 .align(Alignment.CenterEnd)
-                                .padding(end = horizontalPadding)
+                                .padding(
+                                    start = (screenWidth.value * 0.10f).dp,
+                                    end = (screenWidth.value * 0.06f).dp
+                                )
                                 .width(detailsWidth)
                                 .offset(
                                     x = with(LocalDensity.current) { 
@@ -548,7 +554,6 @@ fun ProfileScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(
-                                        start = horizontalPadding * 0.7f, 
                                         top = (screenHeight.value * 0.02f).dp, 
                                         bottom = (screenHeight.value * 0.02f).dp
                                     )
@@ -559,17 +564,33 @@ fun ProfileScreen(
                                 if (isGoogleLogin) {
                                     // 구글 로그인: 이메일/친구수만 표시
                                     val email = currentUserEmail ?: "설정되지 않음"
-                                    if (email != "설정되지 않음" && email.contains("@")) {
-                                        val parts = email.split("@")
-                                        DetailItem("이메일", "${parts[0]}\n@${parts[1]}")
-                                    } else {
-                                        DetailItem("이메일", email)
+                                    if (!email.endsWith("@recordwith.me")) {
+                                        val atIdx = email.indexOf("@")
+                                        val displayEmail = if (atIdx > 0) {
+                                            email.substring(0, atIdx) + "\n" + email.substring(atIdx)
+                                        } else {
+                                            email
+                                        }
+                                        DetailItem("이메일", displayEmail, valueTextAlign = TextAlign.End)
                                     }
                                     DetailItem("친구 수", "${friends.size}명")
                                 } else {
-                                    // 일반 로그인: 이름/아이디/친구수만 표시
-                                    DetailItem("이름", userName.ifEmpty { "설정되지 않음" })
-                                    DetailItem("아이디", userDisplayId.ifEmpty { "설정되지 않음" })
+                                    // 일반 로그인: 조건 분기
+                                    if (currentUserEmail?.endsWith("@recordwith.me") == true) {
+                                        DetailItem("이름", userName.ifEmpty { "설정되지 않음" })
+                                        DetailItem("아이디", userDisplayId.ifEmpty { "설정되지 않음" })
+                                    } else {
+                                        if (!currentUserEmail.isNullOrBlank()) {
+                                            val email = currentUserEmail
+                                            val atIdx = email.indexOf("@")
+                                            val displayEmail = if (atIdx > 0) {
+                                                email.substring(0, atIdx) + "\n" + email.substring(atIdx)
+                                            } else {
+                                                email
+                                            }
+                                            DetailItem("이메일", displayEmail, valueTextAlign = TextAlign.End)
+                                        }
+                                    }
                                     DetailItem("친구 수", "${friends.size}명")
                                 }
                                 
@@ -995,14 +1016,11 @@ fun ProfileScreen(
 
 // 상세 정보 아이템 컴포저블
 @Composable
-fun DetailItem(label: String, value: String) {
+fun DetailItem(label: String, value: String, valueTextAlign: TextAlign = TextAlign.Start) {
     val configuration = LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
     val screenHeight = configuration.screenHeightDp.dp
-    
-    // 화면 크기에 따른 간격 조정
     val itemSpacing = (screenWidth.value * 0.04f).dp
-    
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -1019,7 +1037,9 @@ fun DetailItem(label: String, value: String) {
         Text(
             text = value,
             fontSize = (screenWidth.value * 0.035f).sp,
-            fontWeight = FontWeight.SemiBold
+            fontWeight = FontWeight.SemiBold,
+            textAlign = valueTextAlign,
+            modifier = Modifier.widthIn(min = 0.dp, max = (screenWidth.value * 0.35f).dp)
         )
     }
 }

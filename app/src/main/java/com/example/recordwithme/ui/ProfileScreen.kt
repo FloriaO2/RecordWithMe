@@ -51,6 +51,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -100,15 +102,18 @@ fun FriendItem(
         )
     }
 
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+    
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 12.dp)
+            .padding(start = (screenWidth.value * 0.03f).dp)
     ) {
         Box(
             modifier = Modifier
-                .size(50.dp)
+                .size((screenWidth.value * 0.125f).dp)
                 .clip(CircleShape)
                 .background(Color(0xFFBDBDBD)),
             contentAlignment = Alignment.Center
@@ -116,14 +121,14 @@ fun FriendItem(
             Text(
                 text = friend.initial,
                 color = Color.White,
-                fontSize = 20.sp,
+                fontSize = (screenWidth.value * 0.05f).sp,
                 fontWeight = FontWeight.Bold
             )
         }
 
-        Spacer(modifier = Modifier.width(16.dp))
+        Spacer(modifier = Modifier.width((screenWidth.value * 0.04f).dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(friend.name, fontWeight = FontWeight.Medium, fontSize = 16.sp)
+            Text(friend.name, fontWeight = FontWeight.Medium, fontSize = (screenWidth.value * 0.04f).sp)
             Text(friend.mutual, color = Color.Gray)
         }
 
@@ -145,10 +150,14 @@ fun FriendSearchDialog(
     onFriendAdded: (Friend) -> Unit,
     currentFriendIds: List<String>
 ) {
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+    val screenHeight = configuration.screenHeightDp.dp
+    
     var searchText by remember { mutableStateOf("") }
     var searchResults by remember { mutableStateOf<List<User>>(emptyList()) }
     var loading by remember { mutableStateOf(false) }
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val context = LocalContext.current
 
     LaunchedEffect(searchText) {
         if (searchText.isBlank()) {
@@ -192,7 +201,7 @@ fun FriendSearchDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height((screenHeight.value * 0.015f).dp))
 
                 if (loading) {
                     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -211,13 +220,13 @@ fun FriendSearchDialog(
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(vertical = 8.dp),
+                                        .padding(vertical = (screenHeight.value * 0.01f).dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(user.name, fontWeight = FontWeight.Medium)
                                         if (user.displayId.isNotEmpty()) {
-                                            Text("@${user.displayId}", fontSize = 12.sp, color = Color.Gray)
+                                            Text("@${user.displayId}", fontSize = (screenWidth.value * 0.03f).sp, color = Color.Gray)
                                         }
                                     }
                                     Button(
@@ -257,10 +266,13 @@ fun FriendSearchDialog(
                                                     ).show()
                                                 }
                                         },
-                                        shape = RoundedCornerShape(12.dp),
-                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                                        shape = RoundedCornerShape((screenWidth.value * 0.03f).dp),
+                                        contentPadding = PaddingValues(
+                                            horizontal = (screenWidth.value * 0.03f).dp, 
+                                            vertical = (screenHeight.value * 0.005f).dp
+                                        )
                                     ) {
-                                        Text("친구 신청", fontSize = 13.sp)
+                                        Text("친구 신청", fontSize = (screenWidth.value * 0.0325f).sp)
                                     }
                                 }
                             }
@@ -292,6 +304,7 @@ fun ProfileScreen(
     val currentUser = auth.currentUser ?: return
     val currentUserId = currentUser.uid
     val currentUserEmail = currentUser.email
+    val context = LocalContext.current
 
     var showFriendDialog by remember { mutableStateOf(false) }
     var showGroupDialog by remember { mutableStateOf(false) }
@@ -346,29 +359,41 @@ fun ProfileScreen(
         }
     }
 
-    // 프로필 이미지 이동 애니메이션
+    // 화면 크기에 따른 반응형 설정
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+    val screenHeight = configuration.screenHeightDp.dp
+    
+    // 화면 크기에 따른 동적 값 계산
+    val horizontalPadding = (screenWidth.value * 0.06f).dp
+    
+    val detailsWidth = (screenWidth.value * 0.45f).dp
+    
+    // 프로필 이미지 크기를 화면 너비에 따라 지속적으로 변경
+    val profileImageSize = (screenWidth.value * 0.35f).dp
+    
     val profileImageOffset by animateFloatAsState(
-        targetValue = if (showDetails) -0.23f else 0f,
+        targetValue = if (showDetails) -(screenWidth.value * 0.03f) / 50f else 0f,
         animationSpec = tween(1000),
         label = "profileImageOffset"
     )
 
-    // 프로필 이미지 세로 위치 조정 (위로 이동)
-    val profileImageVerticalOffset = -50f
+    // 프로필 이미지 세로 위치 조정 (위로 이동) - 화면 세로 크기에 비례
+    val profileImageVerticalOffset = -(screenHeight.value * 0.06f)
 
     // 프로필 텍스트 이동 애니메이션 (구글 로그인일 때는 고정, 일반 로그인일 때만 이동)
     val isGoogleLogin = !(currentUserEmail?.endsWith("@recordwith.me") == true)
     val profileTextOffset by animateFloatAsState(
-        targetValue = if (showDetails && !isGoogleLogin) -0.23f else 0f,
+        targetValue = if (showDetails && !isGoogleLogin) -(screenWidth.value * 0.03f) / 50f else 0f,
         animationSpec = tween(1000),
         label = "profileTextOffset"
     )
 
 
 
-    // Details 우측에서 등장 애니메이션
+    // Details 우측에서 등장 애니메이션 (화면 크기에 따른 상대적 위치)
     val detailsOffset by animateFloatAsState(
-        targetValue = if (showDetails) 0f else 3f,
+        targetValue = if (showDetails) 0f else (3f+screenWidth.value / 300f),
         animationSpec = tween(1000),
         label = "detailsOffset"
     )
@@ -401,15 +426,11 @@ fun ProfileScreen(
                 val email = friendUserDoc.getString("email") ?: ""
                 
                 // 1순위: name이 설정되어 있고 비어있지 않은 경우 name 사용
-                // 2순위: name이 없거나 비어있는 경우 이메일 사용 (@gmail.com 제거)
+                // 2순위: name이 없거나 비어있는 경우 이메일 사용
                 val displayName = if (name.isNotBlank()) {
                     name
                 } else {
-                    if (email.endsWith("@gmail.com")) {
-                        email.removeSuffix("@gmail.com")
-                    } else {
-                        email
-                    }
+                    email
                 }
                 
                 Friend(id, displayName, "친구")
@@ -433,15 +454,18 @@ fun ProfileScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .alpha(profileAlpha)
-                        .padding(vertical = 5.dp),
+                        .padding(vertical = (screenHeight.value * 0.012f).dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     // Profile 텍스트는 항상 상단 중앙에 고정
                     Text(
                         "Profile", 
-                        fontSize = 24.sp, 
+                        fontSize = (screenWidth.value * 0.06f).sp, 
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(top = 10.dp, bottom = 10.dp)
+                        modifier = Modifier.padding(
+                            top = (screenHeight.value * 0.012f).dp, 
+                            bottom = (screenHeight.value * 0.012f).dp
+                        )
                     )
 
                     // 프로필과 상세 정보를 포함하는 Box
@@ -461,13 +485,13 @@ fun ProfileScreen(
                                 }
                             )
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(140.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(0xFFE0E0E0)),
-                                contentAlignment = Alignment.Center
-                            ) {
+                                                    Box(
+                            modifier = Modifier
+                                .size(profileImageSize)
+                                .clip(CircleShape)
+                                .background(Color(0xFFE0E0E0)),
+                            contentAlignment = Alignment.Center
+                        ) {
                                 val displayText = when {
                                     userName.isNotEmpty() -> userName.first().uppercaseChar().toString()
                                     userDisplayId.isNotEmpty() -> userDisplayId.first().uppercaseChar().toString()
@@ -475,12 +499,12 @@ fun ProfileScreen(
                                     else -> "U"
                                 }
 
-                                Text(
-                                    text = displayText,
-                                    fontSize = 48.sp,
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold
-                                )
+                                                            Text(
+                                text = displayText,
+                                fontSize = (profileImageSize.value * 0.35).sp,
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold
+                            )
                             }
                         }
 
@@ -493,7 +517,7 @@ fun ProfileScreen(
                                 }
                             )
                         ) {
-                            Spacer(modifier = Modifier.height(160.dp)) // 이미지 높이 + 간격 (12dp 추가)
+                            Spacer(modifier = Modifier.height(profileImageSize + (screenHeight.value * 0.025f).dp)) // 이미지 높이 + 간격
 
                             val displayName = when {
                                 userName.isNotEmpty() -> userName
@@ -502,9 +526,9 @@ fun ProfileScreen(
                                 else -> currentUserId
                             }
 
-                            Text(displayName, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                            Text(displayName, fontSize = (screenWidth.value * 0.055f).sp, fontWeight = FontWeight.Bold)
                             if (userDisplayId.isNotEmpty()) {
-                                Text("@$userDisplayId", fontSize = 16.sp, color = Color.Gray)
+                                Text("@$userDisplayId", fontSize = (screenWidth.value * 0.04f).sp, color = Color.Gray)
                             }
                         }
 
@@ -512,20 +536,24 @@ fun ProfileScreen(
                         Column(
                             modifier = Modifier
                                 .align(Alignment.CenterEnd)
-                                .padding(end = 24.dp)
-                                .width(200.dp)
+                                .padding(end = horizontalPadding)
+                                .width(detailsWidth)
                                 .offset(
                                     x = with(LocalDensity.current) { 
-                                        (detailsOffset * 300).toDp()
+                                        (detailsOffset * (screenWidth.value * 0.95f)).toDp()
                                     },
-                                    y = if (isGoogleLogin) (-11).dp else 20.dp
+                                    y = if (isGoogleLogin) -(screenHeight.value * 0.013f).dp else (screenHeight.value * 0.025f).dp
                                 )
                         ) {
                             // 상세 정보 내용
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(start = 16.dp, top = 16.dp, bottom = 16.dp)
+                                    .padding(
+                                        start = horizontalPadding * 0.7f, 
+                                        top = (screenHeight.value * 0.02f).dp, 
+                                        bottom = (screenHeight.value * 0.02f).dp
+                                    )
                             ) {
                                 // 구글 로그인인지 확인 (@recordwith.me가 아닌 경우 모두 구글 로그인)
                                 val isGoogleLogin = !(currentUserEmail?.endsWith("@recordwith.me") == true)
@@ -554,12 +582,15 @@ fun ProfileScreen(
                                     },
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .offset(y = (-12).dp, x = 12.dp)
+                                        .offset(
+                                            y = -(screenHeight.value * 0.015f).dp, 
+                                            x = (screenWidth.value * 0.03f).dp
+                                        )
                                 ) {
                                     Text(
                                         "회원 탈퇴",
                                         color = Color(0xFF8B0000), // 검붉은 색
-                                        fontSize = 12.sp,
+                                        fontSize = (screenWidth.value * 0.03f).sp,
                                         fontWeight = FontWeight.Medium,
                                         modifier = Modifier.fillMaxWidth(),
                                         textAlign = TextAlign.End
@@ -569,14 +600,15 @@ fun ProfileScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height((screenHeight.value * 0.02f).dp))
 
-                    // 버튼은 항상 같은 위치와 너비로 고정
+                    // 버튼 너비를 화면 크기에 따라 동적으로 조정
+                    val buttonWidth = (screenWidth.value * 0.85f).dp
                     Button(
                         onClick = { showDetails = !showDetails },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF0F0F0)),
-                        shape = RoundedCornerShape(24.dp),
-                        modifier = Modifier.width(350.dp)
+                        shape = RoundedCornerShape((screenWidth.value * 0.06f).dp),
+                        modifier = Modifier.width(buttonWidth)
                     ) {
                         Text(
                             if (showDetails) "Close Details" else "View Details", 
@@ -589,20 +621,23 @@ fun ProfileScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 5.dp),
+                        .padding(vertical = (screenHeight.value * 0.012f).dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
                         "Profile", 
-                        fontSize = 24.sp, 
+                        fontSize = (screenWidth.value * 0.06f).sp, 
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(top = 10.dp, bottom = 10.dp)
+                        modifier = Modifier.padding(
+                            top = (screenHeight.value * 0.012f).dp, 
+                            bottom = (screenHeight.value * 0.012f).dp
+                        )
                     )
                     
-                    Spacer(modifier = Modifier.height(100.dp))
+                    Spacer(modifier = Modifier.height((screenHeight.value * 0.125f).dp))
                     
                     CircularProgressIndicator(
-                        modifier = Modifier.size(48.dp),
+                        modifier = Modifier.size((screenHeight.value * 0.06f).dp),
                         color = Color(0xFFE0E0E0)
                     )
                 }
@@ -614,8 +649,8 @@ fun ProfileScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(Color.White)
-                        .height(80.dp)
-                        .padding(horizontal = 40.dp, vertical = 12.dp)
+                        .height((screenHeight.value * 0.1f).dp)
+                        .padding(horizontal = horizontalPadding * 1.7f, vertical = (screenHeight.value * 0.015f).dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxSize(),
@@ -624,24 +659,28 @@ fun ProfileScreen(
                     ) {
                         Text("Friends", fontSize = 20.sp, fontWeight = FontWeight.Bold)
 
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy((screenWidth.value * 0.02f).dp)) {
+                            val smallButtonWidth = (screenWidth.value * 0.17f).dp
                             Button(
                                 onClick = { showFriendDialog = true },
-                                modifier = Modifier.width(70.dp).height(48.dp),
+                                modifier = Modifier.width(smallButtonWidth).height((screenHeight.value * 0.06f).dp),
                                 shape = RoundedCornerShape(10),
-                                border = BorderStroke(2.dp, if (showFriendDialog) Color(0xFF424242) else Color.Gray),
+                                border = BorderStroke((screenWidth.value * 0.005f).dp, if (showFriendDialog) Color(0xFF424242) else Color.Gray),
                                 colors = ButtonDefaults.outlinedButtonColors(
                                     containerColor = if (showFriendDialog) Color(0x59282828) else Color.Transparent
                                 ),
-                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
+                                contentPadding = PaddingValues(
+                                    horizontal = (screenWidth.value * 0.015f).dp, 
+                                    vertical = (screenHeight.value * 0.005f).dp
+                                )
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text("+", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = if (showFriendDialog) Color(0xFF424242) else Color.Black)
-                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("+", fontSize = (screenWidth.value * 0.04f).sp, fontWeight = FontWeight.Bold, color = if (showFriendDialog) Color(0xFF424242) else Color.Black)
+                                    Spacer(modifier = Modifier.width((screenWidth.value * 0.01f).dp))
                                     Icon(
                                         Icons.Filled.Person, 
                                         contentDescription = "Add Friend", 
-                                        modifier = Modifier.size(25.dp), 
+                                        modifier = Modifier.size((screenWidth.value * 0.0625f).dp), 
                                         tint = if (showFriendDialog) Color(0xFF424242) else Color.Black
                                     )
                                 }
@@ -664,21 +703,24 @@ fun ProfileScreen(
                                         }
                                     }
                                 },
-                                modifier = Modifier.width(70.dp).height(48.dp),
+                                modifier = Modifier.width(smallButtonWidth).height((screenHeight.value * 0.06f).dp),
                                 shape = RoundedCornerShape(10),
-                                border = BorderStroke(2.dp, if (groupMode) Color(0xBF424242) else Color.Gray),
+                                border = BorderStroke((screenWidth.value * 0.005f).dp, if (groupMode) Color(0xBF424242) else Color.Gray),
                                 colors = ButtonDefaults.outlinedButtonColors(
                                     containerColor = if (groupMode) Color(0x59282828) else Color.Transparent
                                 ),
-                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
+                                contentPadding = PaddingValues(
+                                    horizontal = (screenWidth.value * 0.015f).dp, 
+                                    vertical = (screenHeight.value * 0.005f).dp
+                                )
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text("+", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = if (groupMode) Color(0xFF424242) else Color.Black)
-                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("+", fontSize = (screenWidth.value * 0.04f).sp, fontWeight = FontWeight.Bold, color = if (groupMode) Color(0xFF424242) else Color.Black)
+                                    Spacer(modifier = Modifier.width((screenWidth.value * 0.01f).dp))
                                     Icon(
                                         Icons.Filled.Group, 
                                         contentDescription = "Add Group", 
-                                        modifier = Modifier.size(28.dp), 
+                                        modifier = Modifier.size((screenWidth.value * 0.07f).dp), 
                                         tint = if (groupMode) Color(0xFF424242) else Color.Black
                                     )
                                 }
@@ -692,7 +734,7 @@ fun ProfileScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 48.dp),
+                        .padding(vertical = (screenHeight.value * 0.06f).dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -702,8 +744,8 @@ fun ProfileScreen(
                             "친구가 없습니다.\n친구 추가 버튼을 눌러 친구를 추가해보세요."
                         },
                         color = Color.Gray,
-                        fontSize = 14.sp,
-                        lineHeight = 30.sp,
+                        fontSize = (screenWidth.value * 0.035f).sp,
+                        lineHeight = (screenHeight.value * 0.0375f).sp,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -716,8 +758,8 @@ fun ProfileScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
-                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    contentPadding = PaddingValues(horizontal = horizontalPadding * 1.5f, vertical = (screenHeight.value * 0.02f).dp),
+                    verticalArrangement = Arrangement.spacedBy((screenHeight.value * 0.015f).dp)
                 ) {
                     items(friends) { friend ->
                         val isSelected = friend.id in selectedFriendIds
@@ -771,17 +813,20 @@ fun ProfileScreen(
                 Button(
                     onClick = { showGroupDialog = true },
                     modifier = Modifier
-                        .padding(bottom = 24.dp)
-                        .wrapContentWidth()
-                        .height(48.dp),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF90CAF9),
-                        contentColor = Color.White
-                    ),
-                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 10.dp)
-                ) {
-                    Text("그룹 추가하기", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                                            .padding(bottom = (screenHeight.value * 0.03f).dp)
+                    .wrapContentWidth()
+                    .height((screenHeight.value * 0.06f).dp),
+                shape = RoundedCornerShape((screenWidth.value * 0.05f).dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF90CAF9),
+                    contentColor = Color.White
+                ),
+                contentPadding = PaddingValues(
+                    horizontal = (screenWidth.value * 0.06f).dp, 
+                    vertical = (screenHeight.value * 0.0125f).dp
+                )
+            ) {
+                Text("그룹 추가하기", fontSize = (screenWidth.value * 0.04f).sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
@@ -798,7 +843,7 @@ fun ProfileScreen(
                             onValueChange = { groupName = it },
                             label = { Text("그룹 이름") }
                         )
-                        Spacer(Modifier.height(8.dp))
+                        Spacer(Modifier.height((screenHeight.value * 0.01f).dp))
                         OutlinedTextField(
                             value = groupNote,
                             onValueChange = { groupNote = it },
@@ -809,28 +854,80 @@ fun ProfileScreen(
                 confirmButton = {
                     TextButton(onClick = {
                         if (groupName.isBlank()) return@TextButton
-                        val groupMembers = selectedFriendIds + currentUserId
+                        
+                        // 그룹 생성 (생성자만 멤버로 추가)
                         val groupId = groupName.trim()
                         val groupData = mapOf(
                             "name" to groupName,
                             "note" to groupNote,
-                            "members" to groupMembers.toList(),
-                            "creator" to currentUserId
+                            "members" to listOf(currentUserId),  // 생성자만 초기 멤버
+                            "creator" to currentUserId,
+                            "createdAt" to com.google.firebase.Timestamp.now()
                         )
+                        
                         firestore.collection("groups").document(groupId).set(groupData).addOnSuccessListener {
-                            groupMembers.forEach { memberId ->
-                                val memberGroupData = groupData + ("groupId" to groupId)
-                                firestore.collection("users").document(memberId).collection("groups").document(groupId).set(memberGroupData)
+                            // 생성자를 그룹 멤버로 추가
+                            val memberGroupData = groupData + ("groupId" to groupId)
+                            firestore.collection("users").document(currentUserId).collection("groups").document(groupId).set(memberGroupData)
+                            
+                            // 선택된 친구들에게 그룹 초대 보내기
+                            selectedFriendIds.forEach { friendId ->
+                                val inviteData = mapOf(
+                                    "groupId" to groupId,
+                                    "groupName" to groupName,
+                                    "groupNote" to groupNote,
+                                    "inviterId" to currentUserId,
+                                    "inviterName" to (userName.ifBlank { currentUserEmail ?: "Unknown" }),
+                                    "invitedAt" to com.google.firebase.Timestamp.now(),
+                                    "status" to "pending"  // pending, accepted, declined
+                                )
+                                
+                                // Firestore에 초대 저장
+                                firestore.collection("users")
+                                    .document(friendId)
+                                    .collection("groupInvites")
+                                    .document(groupId)
+                                    .set(inviteData)
+                                
+                                // Realtime Database에 알림 저장
+                                val realtimeDb = com.google.firebase.database.FirebaseDatabase.getInstance().reference
+                                val notificationData = mapOf(
+                                    "type" to "groupInvite",
+                                    "groupId" to groupId,
+                                    "groupName" to groupName,
+                                    "inviterId" to currentUserId,
+                                    "inviterName" to (userName.ifBlank { currentUserEmail ?: "Unknown" }),
+                                    "timestamp" to com.google.firebase.database.ServerValue.TIMESTAMP
+                                )
+                                
+                                realtimeDb.child("notifications")
+                                    .child(friendId)
+                                    .push()
+                                    .setValue(notificationData)
                             }
+                            
                             groupName = ""
                             groupNote = ""
                             selectedFriendIds.clear()
                             GroupModeState.isGroupMode = false
                             showGroupDialog = false
+                            
+                            android.widget.Toast.makeText(
+                                context,
+                                "그룹이 생성되었습니다. 친구들에게 초대를 보냈습니다.",
+                                android.widget.Toast.LENGTH_SHORT
+                            ).show()
+                            
                             navController.popBackStack() // 그룹 생성 후 GroupScreen으로 돌아가기
+                        }.addOnFailureListener { e ->
+                            android.widget.Toast.makeText(
+                                context,
+                                "그룹 생성에 실패했습니다: ${e.message}",
+                                android.widget.Toast.LENGTH_SHORT
+                            ).show()
                         }
                     }) {
-                        Text("완료")
+                        Text("그룹 생성 및 초대 보내기")
                     }
                 },
                 dismissButton = {
@@ -886,21 +983,29 @@ fun ProfileScreen(
 // 상세 정보 아이템 컴포저블
 @Composable
 fun DetailItem(label: String, value: String) {
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+    val screenHeight = configuration.screenHeightDp.dp
+    
+    // 화면 크기에 따른 간격 조정
+    val itemSpacing = (screenWidth.value * 0.04f).dp
+    
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
+            .padding(vertical = (screenHeight.value * 0.005f).dp),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Text(
             text = label,
-            fontSize = 14.sp,
+            fontSize = (screenWidth.value * 0.035f).sp,
             color = Color.Gray,
             fontWeight = FontWeight.Medium
         )
+        Spacer(modifier = Modifier.width(itemSpacing))
         Text(
             text = value,
-            fontSize = 14.sp,
+            fontSize = (screenWidth.value * 0.035f).sp,
             fontWeight = FontWeight.SemiBold
         )
     }

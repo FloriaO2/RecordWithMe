@@ -381,7 +381,7 @@ fun ProfileScreen(
     // 프로필 이미지 세로 위치 조정 (위로 이동) - 화면 세로 크기에 비례
     val profileImageVerticalOffset = -(screenHeight.value * 0.06f)
 
-    // 프로필 텍스트 이동 애니메이션 (구글 로그인일 때는 고정, 일반 로그인일 때만 이동)
+    // 프로필 텍스트 이동 애니메이션 (구글 로그일 때는 고정, 일반 로그일 때만 이동)
     val isGoogleLogin = !(currentUserEmail?.endsWith("@recordwith.me") == true)
     val profileTextOffset by animateFloatAsState(
         targetValue = if (showDetails && !isGoogleLogin) -(screenWidth.value * 0.03f) / 50f else 0f,
@@ -649,8 +649,8 @@ fun ProfileScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(Color.White)
-                        .height((screenHeight.value * 0.1f).dp)
-                        .padding(horizontal = horizontalPadding * 1.7f, vertical = (screenHeight.value * 0.015f).dp)
+                        .height((screenHeight.value * 0.06f).dp)
+                        .padding(horizontal = horizontalPadding * 1.7f, vertical = (screenHeight.value * 0.008f).dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxSize(),
@@ -758,7 +758,7 @@ fun ProfileScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
-                    contentPadding = PaddingValues(horizontal = horizontalPadding * 1.5f, vertical = (screenHeight.value * 0.02f).dp),
+                    contentPadding = PaddingValues(horizontal = horizontalPadding * 1.5f, vertical = (screenHeight.value * 0.005f).dp),
                     verticalArrangement = Arrangement.spacedBy((screenHeight.value * 0.015f).dp)
                 ) {
                     items(friends) { friend ->
@@ -870,40 +870,15 @@ fun ProfileScreen(
                             val memberGroupData = groupData + ("groupId" to groupId)
                             firestore.collection("users").document(currentUserId).collection("groups").document(groupId).set(memberGroupData)
                             
-                            // 선택된 친구들에게 그룹 초대 보내기
+                            // 선택된 친구들을 바로 그룹 멤버로 추가
                             selectedFriendIds.forEach { friendId ->
-                                val inviteData = mapOf(
-                                    "groupId" to groupId,
-                                    "groupName" to groupName,
-                                    "groupNote" to groupNote,
-                                    "inviterId" to currentUserId,
-                                    "inviterName" to (userName.ifBlank { currentUserEmail ?: "Unknown" }),
-                                    "invitedAt" to com.google.firebase.Timestamp.now(),
-                                    "status" to "pending"  // pending, accepted, declined
-                                )
+                                // 친구를 그룹 멤버로 추가
+                                val updatedMembers = groupData["members"] as? List<String> ?: listOf(currentUserId)
+                                val newMembers = updatedMembers + friendId
+                                firestore.collection("groups").document(groupId).update("members", newMembers)
                                 
-                                // Firestore에 초대 저장
-                                firestore.collection("users")
-                                    .document(friendId)
-                                    .collection("groupInvites")
-                                    .document(groupId)
-                                    .set(inviteData)
-                                
-                                // Realtime Database에 알림 저장
-                                val realtimeDb = com.google.firebase.database.FirebaseDatabase.getInstance().reference
-                                val notificationData = mapOf(
-                                    "type" to "groupInvite",
-                                    "groupId" to groupId,
-                                    "groupName" to groupName,
-                                    "inviterId" to currentUserId,
-                                    "inviterName" to (userName.ifBlank { currentUserEmail ?: "Unknown" }),
-                                    "timestamp" to com.google.firebase.database.ServerValue.TIMESTAMP
-                                )
-                                
-                                realtimeDb.child("notifications")
-                                    .child(friendId)
-                                    .push()
-                                    .setValue(notificationData)
+                                // 친구의 그룹 목록에도 추가
+                                firestore.collection("users").document(friendId).collection("groups").document(groupId).set(memberGroupData)
                             }
                             
                             groupName = ""
@@ -914,7 +889,7 @@ fun ProfileScreen(
                             
                             android.widget.Toast.makeText(
                                 context,
-                                "그룹이 생성되었습니다. 친구들에게 초대를 보냈습니다.",
+                                "그룹이 생성되었습니다.",
                                 android.widget.Toast.LENGTH_SHORT
                             ).show()
                             
@@ -927,7 +902,7 @@ fun ProfileScreen(
                             ).show()
                         }
                     }) {
-                        Text("그룹 생성 및 초대 보내기")
+                        Text("그룹 생성")
                     }
                 },
                 dismissButton = {

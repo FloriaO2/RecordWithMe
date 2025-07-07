@@ -85,4 +85,7 @@ dependencies {
     implementation("com.google.firebase:firebase-storage-ktx")
 
     implementation ("com.google.firebase:firebase-database-ktx")
+
+    // MaterialContainerTransform을 위한 material 라이브러리 명시적 추가
+    implementation("com.google.android.material:material:1.11.0")
 }

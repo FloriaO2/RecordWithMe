@@ -68,10 +68,10 @@ fun GroupScreen(navController: NavController) {
     val groups = remember { mutableStateListOf<UserGroup>() }
     val isLoading = remember { mutableStateOf(true) }
     val friends = remember { mutableStateListOf<String>() }
-    
+
     // 아코디언 패널 상태
     var selectedGroupId by remember { mutableStateOf<String?>(null) }
-    
+
     // 화면 크기에 따른 반응형 설정
     val configuration = LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
@@ -83,7 +83,7 @@ fun GroupScreen(navController: NavController) {
             // 현재 사용자 ID 가져오기
             val auth = FirebaseAuth.getInstance()
             val currentUserId = auth.currentUser?.uid ?: return@LaunchedEffect
-            
+
             // 친구 목록 가져오기
             val friendsSnapshot = firestore.collection("users")
                 .document(currentUserId)
@@ -92,7 +92,7 @@ fun GroupScreen(navController: NavController) {
                 .await()
             friends.clear()
             friends.addAll(friendsSnapshot.documents.map { it.id })
-            
+
             // 그룹 목록 가져오기
             val snapshot = firestore.collection("groups").get().await()
             groups.clear()
@@ -106,7 +106,7 @@ fun GroupScreen(navController: NavController) {
 
                 val group = UserGroup(
                     id = groupId,
-                    name = groupName, 
+                    name = groupName,
                     membersCount = membersCount,
                     note = note,
                     creator = creator,
@@ -131,7 +131,7 @@ fun GroupScreen(navController: NavController) {
             Text(
                 text = "My Groups",
                 style = TextStyle(
-                    fontSize = (screenWidth.value * 0.06f).sp, 
+                    fontSize = (screenWidth.value * 0.06f).sp,
                     fontWeight = FontWeight.Bold
                 ),
                 modifier = Modifier.padding(bottom = (screenHeight.value * 0.02f).dp)
@@ -214,7 +214,7 @@ fun GroupScreen(navController: NavController) {
 
         // FloatingActionButton
         FloatingActionButton(
-            onClick = { 
+            onClick = {
                 if (friends.isEmpty()) {
                     GroupModeState.isGroupMode = true
                     navController.navigate("profile") {
@@ -230,7 +230,7 @@ fun GroupScreen(navController: NavController) {
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(
-                    end = (screenWidth.value * 0.075f).dp, 
+                    end = (screenWidth.value * 0.075f).dp,
                     bottom = (screenHeight.value * 0.05f).dp
                 ),
             containerColor = MaterialTheme.colorScheme.primary
@@ -252,7 +252,7 @@ fun GroupItem(
     val configuration = LocalConfiguration.current
     val localScreenWidth = configuration.screenWidthDp.dp
     val localScreenHeight = configuration.screenHeightDp.dp
-    
+
     // 통합된 카드 컨테이너
     Card(
         modifier = Modifier
@@ -282,7 +282,7 @@ fun GroupItem(
                 Spacer(modifier = Modifier.width((localScreenWidth.value * 0.04f).dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = group.name, 
+                        text = group.name,
                         style = MaterialTheme.typography.bodyLarge.copy(
                             fontSize = (localScreenWidth.value * 0.04f).sp,
                             fontWeight = if (isExpanded) FontWeight.Bold else FontWeight.Normal
@@ -290,7 +290,7 @@ fun GroupItem(
                         color = if (isExpanded) MaterialTheme.colorScheme.primary else Color.Black
                     )
                     Text(
-                        text = "${group.membersCount} members", 
+                        text = "${group.membersCount} members",
                         style = MaterialTheme.typography.bodyMedium.copy(
                             color = if (isExpanded) MaterialTheme.colorScheme.primary.copy(alpha = 0.7f) else Color.Gray,
                             fontSize = (localScreenWidth.value * 0.035f).sp
@@ -298,7 +298,7 @@ fun GroupItem(
                     )
                 }
             }
-            
+
             // 확장된 상세 정보 (공백 없이 연결)
             if (isExpanded) {
                 GroupDetailPanel(
@@ -372,7 +372,7 @@ fun GroupDetailPanel(
                             fontWeight = FontWeight.SemiBold
                         )
                     )
-                    
+
                     TextButton(
                         onClick = { /* 멤버 추가 기능 */ },
                         contentPadding = PaddingValues(0.dp),
@@ -399,7 +399,7 @@ fun GroupDetailPanel(
                             screenHeight = screenHeight
                         )
                     }
-                    
+
                     if (group.members.size > 5) {
                         Text(
                             text = "... 외 ${group.members.size - 5}명",

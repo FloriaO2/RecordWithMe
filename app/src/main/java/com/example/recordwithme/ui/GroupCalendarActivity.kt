@@ -6,27 +6,32 @@ import android.os.Build
 import android.os.Bundle
 import android.view.Gravity
 import android.view.ViewGroup
+import android.widget.Button
 import android.widget.GridLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityOptionsCompat
 import com.example.recordwithme.R
-import com.google.android.material.floatingactionbutton.FloatingActionButton
-import java.util.*
+import java.util.Calendar
 
 class GroupCalendarActivity : AppCompatActivity() {
-    private var year = 2024
+    private var year = 2024 
     private var month = 7 // 1~12
+    private var groupId: String = ""
+    private var groupName: String = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_group_calendar)
 
+        // Intent에서 그룹 정보 가져오기
+        groupId = intent.getStringExtra("groupId") ?: ""
+        groupName = intent.getStringExtra("groupName") ?: ""
+
         val textMonth = findViewById<TextView>(R.id.textMonth)
         val layoutYearMonth = findViewById<LinearLayout>(R.id.layoutYearMonth)
         val grid = findViewById<GridLayout>(R.id.gridCalendar)
-        val fab = findViewById<FloatingActionButton>(R.id.fabAdd)
 
         // 연/월 변경 버튼 + 연/월 표시 (상단 오른쪽)
         layoutYearMonth.removeAllViews()
@@ -104,6 +109,8 @@ class GroupCalendarActivity : AppCompatActivity() {
                         intent.putExtra("day", d)
                         intent.putExtra("year", year)
                         intent.putExtra("month", month)
+                        intent.putExtra("groupId", groupId)
+                        intent.putExtra("groupName", groupName)
                         intent.putExtra("transitionName", "calendar_cell_${year}_${month}_$d")
                         
                         // Android 5.0 이상에서만 Shared Element Transition 적용
@@ -151,6 +158,11 @@ class GroupCalendarActivity : AppCompatActivity() {
                 month++
             }
             updateCalendar()
+        }
+
+        // 뒤로가기 버튼 클릭 리스너 연결
+        findViewById<Button>(R.id.btnBack).setOnClickListener {
+            onBackPressedDispatcher.onBackPressed()
         }
 
         updateCalendar()

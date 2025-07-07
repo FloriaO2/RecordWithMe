@@ -1,5 +1,6 @@
 package com.example.recordwithme.ui
 
+import android.content.Intent
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -43,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -203,7 +205,8 @@ fun GroupScreen(navController: NavController) {
                                 }
                             },
                             screenWidth = screenWidth,
-                            screenHeight = screenHeight
+                            screenHeight = screenHeight,
+                            navController = navController
                         )
                     }
                 }
@@ -247,7 +250,8 @@ fun GroupItem(
     onClick: () -> Unit,
     onDeleteGroup: (UserGroup) -> Unit,
     screenWidth: androidx.compose.ui.unit.Dp,
-    screenHeight: androidx.compose.ui.unit.Dp
+    screenHeight: androidx.compose.ui.unit.Dp,
+    navController: NavController
 ) {
     val configuration = LocalConfiguration.current
     val localScreenWidth = configuration.screenWidthDp.dp
@@ -306,7 +310,8 @@ fun GroupItem(
                     onDeleteGroup = onDeleteGroup,
                     screenWidth = screenWidth,
                     screenHeight = screenHeight,
-                    isExpanded = isExpanded
+                    isExpanded = isExpanded,
+                    navController = navController
                 )
             }
         }
@@ -319,13 +324,16 @@ fun GroupDetailPanel(
     onDeleteGroup: (UserGroup) -> Unit,
     screenWidth: androidx.compose.ui.unit.Dp,
     screenHeight: androidx.compose.ui.unit.Dp,
-    isExpanded: Boolean
+    isExpanded: Boolean,
+    navController: NavController
 ) {
     val panelHeight by animateFloatAsState(
         targetValue = 1f,
         animationSpec = tween(300),
         label = "panelHeight"
     )
+
+    val context = LocalContext.current
 
     // 상세정보 컨텐츠
     Column(
@@ -414,47 +422,67 @@ fun GroupDetailPanel(
                 Spacer(modifier = Modifier.height((screenHeight.value * 0.005f).dp))
 
                 // 액션 버튼들
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy((screenWidth.value * 0.02f).dp)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.Start),
+                    verticalArrangement = Arrangement.spacedBy((screenHeight.value * 0.003f).dp)
                 ) {
-                    Button(
+                    TextButton(
                         onClick = { /* 편집 기능 */ },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary
-                        ),
-                        shape = RoundedCornerShape((screenWidth.value * 0.02f).dp)
+                        modifier = Modifier.align(Alignment.Start)
                     ) {
                         Icon(
                             Icons.Filled.Edit,
                             contentDescription = "Edit",
-                            modifier = Modifier.size((screenWidth.value * 0.04f).dp)
+                            modifier = Modifier.size((screenWidth.value * 0.04f).dp),
+                            tint = MaterialTheme.colorScheme.primary
                         )
                         Spacer(modifier = Modifier.width((screenWidth.value * 0.02f).dp))
                         Text(
                             text = "편집",
-                            fontSize = (screenWidth.value * 0.035f).sp
+                            fontSize = (screenWidth.value * 0.035f).sp,
+                            color = MaterialTheme.colorScheme.primary
                         )
                     }
 
-                    Button(
+                    TextButton(
                         onClick = { onDeleteGroup(group) },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.Red
-                        ),
-                        shape = RoundedCornerShape((screenWidth.value * 0.02f).dp)
+                        modifier = Modifier.align(Alignment.Start)
                     ) {
                         Icon(
                             Icons.Filled.Delete,
                             contentDescription = "Delete",
-                            modifier = Modifier.size((screenWidth.value * 0.04f).dp)
+                            modifier = Modifier.size((screenWidth.value * 0.04f).dp),
+                            tint = Color.Red
                         )
                         Spacer(modifier = Modifier.width((screenWidth.value * 0.02f).dp))
                         Text(
                             text = "삭제",
-                            fontSize = (screenWidth.value * 0.035f).sp
+                            fontSize = (screenWidth.value * 0.035f).sp,
+                            color = Color.Red
+                        )
+                    }
+
+                    TextButton(
+                        onClick = {
+                            val intent = Intent(context, com.example.recordwithme.ui.GroupCalendarActivity::class.java)
+                            intent.putExtra("groupId", group.id)
+                            context.startActivity(intent)
+                        },
+                        modifier = Modifier.align(Alignment.Start)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Person, // 캘린더 아이콘으로 교체 가능
+                            contentDescription = "Group Calendar",
+                            modifier = Modifier.size((screenWidth.value * 0.04f).dp),
+                            tint = MaterialTheme.colorScheme.secondary
+                        )
+                        Spacer(modifier = Modifier.width((screenWidth.value * 0.02f).dp))
+                        Text(
+                            text = "그룹 캘린더",
+                            fontSize = (screenWidth.value * 0.035f).sp,
+                            color = MaterialTheme.colorScheme.secondary
                         )
                     }
                 }

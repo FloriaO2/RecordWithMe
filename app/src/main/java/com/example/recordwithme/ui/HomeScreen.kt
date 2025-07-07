@@ -2,10 +2,14 @@ package com.example.recordwithme.ui
 
 import android.Manifest
 import android.app.DownloadManager
+import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Environment
+import android.provider.MediaStore
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -45,11 +49,13 @@ import com.google.accompanist.flowlayout.FlowRow
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.storage.FirebaseStorage
+import android.util.Base64
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.asImageBitmap
 import kotlinx.coroutines.tasks.await
 import java.util.*
 
-data class Photo(val url: String, val date: String)
+data class Photo(val url: String, val date: String, val isBase64: Boolean = false)
 data class Group(val id: String, val name: String, val photos: List<Photo> = emptyList())
 
 @Composable
@@ -117,7 +123,8 @@ fun HomeScreen() {
                 selectedGroupPhotos = snapshot.documents.mapNotNull { doc ->
                     val url = doc.getString("url") ?: return@mapNotNull null
                     val date = doc.getString("date") ?: "날짜 없음"
-                    Photo(url, date)
+                    val isBase64 = doc.getBoolean("isBase64") ?: false
+                    Photo(url, date, isBase64)
                 }
             } catch (_: Exception) {
                 selectedGroupPhotos = emptyList()
@@ -140,7 +147,8 @@ fun HomeScreen() {
                     val groupPhotos = snapshot.documents.mapNotNull { doc ->
                         val url = doc.getString("url") ?: return@mapNotNull null
                         val date = doc.getString("date") ?: "날짜 없음"
-                        Photo(url, date)
+                        val isBase64 = doc.getBoolean("isBase64") ?: false
+                        Photo(url, date, isBase64)
                     }
                     allPhotosList.addAll(groupPhotos)
                 }
@@ -250,7 +258,7 @@ fun HomeScreen() {
                                     contentAlignment = Alignment.Center
                                 ) {
                                     if (representativePhoto != null) {
-                                        AnimatedRepresentativePhoto(representativePhoto.url)
+                                        AnimatedRepresentativePhoto(representativePhoto.url, representativePhoto.isBase64)
                                     } else {
                                         Text("대표사진 자리", color = Color.Gray)
                                     }
@@ -270,28 +278,25 @@ fun HomeScreen() {
                                 crossAxisSpacing = 12.dp
                             ) {
                                 photos.forEach { photo ->
-                                    if (photo.url.startsWith("https://")) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(110.dp)
-                                                .background(Color.LightGray)
-                                                .clickable { 
-                                                    selectedPhotoUrl = photo.url
-                                                    currentPhotoIndex = photos.indexOf(photo)
-                                                },
-                                            contentAlignment = Alignment.Center
-                                        ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(110.dp)
+                                            .background(Color.LightGray)
+                                            .clickable { 
+                                                selectedPhotoUrl = photo.url
+                                                currentPhotoIndex = photos.indexOf(photo)
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (photo.isBase64) {
+                                            Base64Image(photo.url, Modifier.size(110.dp))
+                                        } else if (photo.url.startsWith("https://")) {
                                             AsyncImage(
                                                 model = photo.url,
                                                 contentDescription = "사진",
                                                 modifier = Modifier.size(110.dp)
                                             )
-                                        }
-                                    } else {
-                                        Box(
-                                            modifier = Modifier.size(110.dp).background(Color.LightGray),
-                                            contentAlignment = Alignment.Center
-                                        ) {
+                                        } else {
                                             Text("이미지 오류")
                                         }
                                     }
@@ -338,15 +343,27 @@ fun HomeScreen() {
                         .padding(32.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    AsyncImage(
-                        model = selectedPhotoUrl,
-                        contentDescription = "팝업 이미지",
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(1f)
-                            .background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
-                            .padding(8.dp)
-                    )
+                    val currentPhoto = currentPhotos.getOrNull(currentPhotoIndex)
+                    if (currentPhoto?.isBase64 == true) {
+                        Base64Image(
+                            selectedPhotoUrl!!,
+                            Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(1f)
+                                .background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
+                                .padding(8.dp)
+                        )
+                    } else {
+                        AsyncImage(
+                            model = selectedPhotoUrl,
+                            contentDescription = "팝업 이미지",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(1f)
+                                .background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
+                                .padding(8.dp)
+                        )
+                    }
                 }
                 
                 // 상단 버튼들 (저장, 닫기)
@@ -358,7 +375,8 @@ fun HomeScreen() {
                     // 저장 버튼
                     IconButton(
                         onClick = { 
-                            saveImageToGallery(context, selectedPhotoUrl!!)
+                            val currentPhoto = currentPhotos.getOrNull(currentPhotoIndex)
+                            saveImageToGallery(context, selectedPhotoUrl!!, currentPhoto?.isBase64 ?: false)
                         },
                         modifier = Modifier
                             .background(Color.White.copy(alpha = 0.2f), CircleShape)
@@ -436,25 +454,49 @@ fun HomeScreen() {
     }
 }
 
-fun saveImageToGallery(context: Context, imageUrl: String) {
+fun saveImageToGallery(context: Context, imageUrl: String, isBase64: Boolean = false) {
     try {
-        val request = DownloadManager.Request(Uri.parse(imageUrl))
-            .setTitle("사진 저장 중")
-            .setDescription("갤러리에 저장됩니다.")
-            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-            .setDestinationInExternalPublicDir(Environment.DIRECTORY_PICTURES, "RecordWithMe_${System.currentTimeMillis()}.jpg")
-            .setAllowedOverMetered(true)
-            .setAllowedOverRoaming(true)
+        if (isBase64) {
+            // Base64 이미지를 갤러리에 저장
+            val bytes = Base64.decode(imageUrl, Base64.DEFAULT)
+            val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+            
+            val filename = "RecordWithMe_${System.currentTimeMillis()}.jpg"
+            val contentValues = ContentValues().apply {
+                put(MediaStore.Images.Media.DISPLAY_NAME, filename)
+                put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+                put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES)
+            }
+            
+            val resolver = context.contentResolver
+            val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
+            
+            uri?.let { imageUri ->
+                resolver.openOutputStream(imageUri)?.use { outputStream ->
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 100, outputStream)
+                }
+                Toast.makeText(context, "이미지가 갤러리에 저장되었습니다", Toast.LENGTH_SHORT).show()
+            }
+        } else {
+            // URL 이미지를 다운로드
+            val request = DownloadManager.Request(Uri.parse(imageUrl))
+                .setTitle("사진 저장 중")
+                .setDescription("갤러리에 저장됩니다.")
+                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                .setDestinationInExternalPublicDir(Environment.DIRECTORY_PICTURES, "RecordWithMe_${System.currentTimeMillis()}.jpg")
+                .setAllowedOverMetered(true)
+                .setAllowedOverRoaming(true)
 
-        val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-        dm.enqueue(request)
-        Toast.makeText(context, "이미지 저장을 시작했습니다", Toast.LENGTH_SHORT).show()
+            val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+            dm.enqueue(request)
+            Toast.makeText(context, "이미지 저장을 시작했습니다", Toast.LENGTH_SHORT).show()
+        }
     } catch (e: Exception) {
         Toast.makeText(context, "저장 실패: ${e.message}", Toast.LENGTH_LONG).show()
     }
 }
 
-// 이미지를 Firebase Storage에 업로드 후 Firestore에 다운로드 URL을 저장하는 함수
+// 이미지를 Base64로 인코딩하여 Firestore에 저장하는 함수
 private fun uploadImageToFirebase(
     imageUri: Uri,
     groupId: String?,
@@ -473,26 +515,26 @@ private fun uploadImageToFirebase(
     val day = calendar.get(Calendar.DAY_OF_MONTH)
     val dateString = "${year}년 ${month}월 ${day}일"
 
-    // Storage에 업로드
-    val storageRef = FirebaseStorage.getInstance().reference
-    val fileRef = storageRef.child("group_photos/$groupId/${System.currentTimeMillis()}.jpg")
-    val inputStream = context.contentResolver.openInputStream(imageUri)
-    if (inputStream == null) {
-        Toast.makeText(context, "이미지 파일을 열 수 없습니다", Toast.LENGTH_SHORT).show()
-        onSuccess(false)
-        return
-    }
-    val uploadTask = fileRef.putStream(inputStream)
-    uploadTask.continueWithTask { task ->
-        if (!task.isSuccessful) throw task.exception ?: Exception("Upload failed")
-        fileRef.downloadUrl
-    }.addOnSuccessListener { uri ->
-        // Firestore에 Storage 다운로드 URL 저장
+    try {
+        // 이미지를 Base64로 인코딩
+        val inputStream = context.contentResolver.openInputStream(imageUri)
+        if (inputStream == null) {
+            Toast.makeText(context, "이미지 파일을 열 수 없습니다", Toast.LENGTH_SHORT).show()
+            onSuccess(false)
+            return
+        }
+
+        val bytes = inputStream.readBytes()
+        val base64String = Base64.encodeToString(bytes, Base64.DEFAULT)
+        
+        // Firestore에 Base64 데이터 저장
         val photoData = mapOf(
-            "url" to uri.toString(),
+            "url" to base64String,
             "date" to dateString,
-            "uploadedAt" to Timestamp.now()
+            "uploadedAt" to Timestamp.now(),
+            "isBase64" to true
         )
+        
         firestore.collection("groups")
             .document(groupId)
             .collection("photos")
@@ -508,36 +550,64 @@ private fun uploadImageToFirebase(
             .addOnFailureListener { e ->
                 Toast.makeText(
                     context,
-                    "Firestore 저장 실패: ${e.message}",
+                    "저장 실패: ${e.message}",
                     Toast.LENGTH_SHORT
                 ).show()
                 onSuccess(false)
             }
-    }.addOnFailureListener { e ->
+    } catch (e: Exception) {
         Toast.makeText(
             context,
-            "Storage 업로드 실패: ${e.message}",
+            "이미지 처리 실패: ${e.message}",
             Toast.LENGTH_SHORT
         ).show()
         onSuccess(false)
     }
 }
 
+@Composable
+fun Base64Image(base64String: String, modifier: Modifier = Modifier) {
+    var bitmap by remember(base64String) { mutableStateOf<android.graphics.Bitmap?>(null) }
+
+    LaunchedEffect(base64String) {
+        try {
+            val bytes = Base64.decode(base64String, Base64.DEFAULT)
+            bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        } catch (e: Exception) {
+            // Base64 디코딩 실패 시 처리
+        }
+    }
+
+    if (bitmap != null) {
+        Image(bitmap = bitmap!!.asImageBitmap(), contentDescription = null, modifier = modifier)
+    } else {
+        Box(modifier = modifier.background(Color.LightGray), contentAlignment = Alignment.Center) {
+            Text("이미지 로딩 중...")
+        }
+    }
+}
+
 @OptIn(ExperimentalAnimationApi::class)
 @Composable
-fun AnimatedRepresentativePhoto(url: String?) {
+fun AnimatedRepresentativePhoto(url: String?, isBase64: Boolean = false) {
     AnimatedContent(
         targetState = url,
         transitionSpec = {
             slideInHorizontally { it } with slideOutHorizontally { -it }
         }
     ) { targetUrl ->
-        if (targetUrl != null && targetUrl.startsWith("https://")) {
-            AsyncImage(
-                model = targetUrl,
-                contentDescription = "대표사진",
-                modifier = Modifier.size(200.dp)
-            )
+        if (targetUrl != null) {
+            if (isBase64) {
+                Base64Image(targetUrl, Modifier.size(200.dp))
+            } else if (targetUrl.startsWith("https://")) {
+                AsyncImage(
+                    model = targetUrl,
+                    contentDescription = "대표사진",
+                    modifier = Modifier.size(200.dp)
+                )
+            } else {
+                Text("대표사진 자리", color = Color.Gray)
+            }
         } else {
             Text("대표사진 자리", color = Color.Gray)
         }

@@ -232,11 +232,17 @@ fun HomeScreen() {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier
-                                .clickable {
-                                    selectedGroup = if (selectedGroup == group) null else group
-                                }
                                 .pointerInput(group.id) {
                                     detectTapGestures(
+                                        onTap = {
+                                            if (selectedGroup == group) {
+                                                selectedGroup = null
+                                                selectedGroupPhotos = emptyList()
+                                            } else {
+                                                selectedGroup = group
+                                                selectedGroupPhotos = emptyList()
+                                            }
+                                        },
                                         onLongPress = {
                                             thumbnailGroupId = group.id
                                             thumbnailGalleryLauncher.launch("image/*")
@@ -274,7 +280,7 @@ fun HomeScreen() {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            val photosToShow = selectedGroupPhotos.ifEmpty { allPhotos }
+            val photosToShow = if (selectedGroup != null) selectedGroupPhotos else allPhotos
             
             // 확대 뷰 (팝업창)
             

@@ -23,19 +23,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -49,20 +37,11 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.FloatingActionButtonDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -72,11 +51,22 @@ import com.google.accompanist.flowlayout.FlowRow
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
 import kotlinx.coroutines.tasks.await
-import java.util.Calendar
+import java.util.*
 
 data class Photo(val url: String, val date: String, val isBase64: Boolean = false)
-data class Group(val id: String, val name: String, val photos: List<Photo> = emptyList())
+data class Group(
+    val id: String,
+    val name: String,
+    val photos: List<Photo> = emptyList(),
+    val thumbnailUrl: String? = null,
+    val thumbnailIsBase64: Boolean = false
+)
 
 @Composable
 fun HomeScreen() {
@@ -93,6 +83,7 @@ fun HomeScreen() {
     var refreshTrigger by remember { mutableStateOf(0) }
     var selectedPhotoUrl by remember { mutableStateOf<String?>(null) }
     var currentPhotoIndex by remember { mutableStateOf(0) }
+    var thumbnailGroupId by remember { mutableStateOf<String?>(null) }
 
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -110,7 +101,20 @@ fun HomeScreen() {
         if (isGranted) galleryLauncher.launch("image/*")
     }
 
-    LaunchedEffect(currentUser?.uid) {
+    val thumbnailGalleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let { selectedImageUri ->
+            val groupId = thumbnailGroupId
+            if (groupId != null) {
+                uploadThumbnailToFirestore(selectedImageUri, groupId, firestore, context) {
+                    refreshTrigger++
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(currentUser?.uid, refreshTrigger) {
         if (currentUser?.uid != null) {
             try {
                 loading = true
@@ -122,7 +126,10 @@ fun HomeScreen() {
                 groupList = snapshot.documents.mapNotNull { doc ->
                     val groupId = doc.id
                     val name = doc.getString("name") ?: return@mapNotNull null
-                    Group(groupId, name)
+                    val groupDoc = firestore.collection("groups").document(groupId).get().await()
+                    val thumbnailUrl = groupDoc.getString("thumbnailUrl")
+                    val thumbnailIsBase64 = groupDoc.getBoolean("thumbnailIsBase64") ?: false
+                    Group(groupId, name, thumbnailUrl = thumbnailUrl, thumbnailIsBase64 = thumbnailIsBase64)
                 }
             } catch (_: Exception) {
                 groupList = emptyList()
@@ -225,9 +232,24 @@ fun HomeScreen() {
                         val isSelected = group == selectedGroup
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.clickable {
-                                selectedGroup = if (selectedGroup == group) null else group
-                            }
+                            modifier = Modifier
+                                .pointerInput(group.id) {
+                                    detectTapGestures(
+                                        onTap = {
+                                            if (selectedGroup == group) {
+                                                selectedGroup = null
+                                                selectedGroupPhotos = emptyList()
+                                            } else {
+                                                selectedGroup = group
+                                                selectedGroupPhotos = emptyList()
+                                            }
+                                        },
+                                        onLongPress = {
+                                            thumbnailGroupId = group.id
+                                            thumbnailGalleryLauncher.launch("image/*")
+                                        }
+                                    )
+                                }
                         ) {
                             Box(
                                 modifier = Modifier
@@ -237,7 +259,19 @@ fun HomeScreen() {
                                         if (isSelected) Modifier.border(3.dp, Color(0xFF1976D2), CircleShape) else Modifier
                                     ),
                                 contentAlignment = Alignment.Center
-                            ) {}
+                            ) {
+                                if (group.thumbnailUrl != null) {
+                                    if (group.thumbnailIsBase64) {
+                                        Base64Image(group.thumbnailUrl, Modifier.size(64.dp).clip(CircleShape))
+                                    } else if (group.thumbnailUrl.startsWith("https://")) {
+                                        AsyncImage(
+                                            model = group.thumbnailUrl,
+                                            contentDescription = "썸네일",
+                                            modifier = Modifier.size(64.dp).clip(CircleShape)
+                                        )
+                                    }
+                                }
+                            }
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(group.name, color = Color.DarkGray)
                         }
@@ -247,7 +281,7 @@ fun HomeScreen() {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            val photosToShow = selectedGroupPhotos.ifEmpty { allPhotos }
+            val photosToShow = if (selectedGroup != null) selectedGroupPhotos else allPhotos
             
             // 확대 뷰 (팝업창)
             
@@ -261,6 +295,8 @@ fun HomeScreen() {
                 }
             } else {
                 val photosByDate = photosToShow.groupBy { it.date }
+                    .toList()
+                    .sortedByDescending { it.first } // 날짜 내림차순 정렬
                 val representativePhoto = photosToShow.firstOrNull()
                 LazyColumn(
                     modifier = Modifier
@@ -287,7 +323,7 @@ fun HomeScreen() {
                         }
                         Spacer(modifier = Modifier.height(16.dp))
                     }
-                    photosByDate.forEach { (date, photos) ->
+                    for ((date, photos) in photosByDate) {
                         item {
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(date, color = Color.Black, fontSize = 25.sp, modifier = Modifier.padding(start = 16.dp))
@@ -495,7 +531,7 @@ fun saveImageToGallery(context: Context, imageUrl: String, isBase64: Boolean = f
                 resolver.openOutputStream(imageUri)?.use { outputStream ->
                     bitmap.compress(Bitmap.CompressFormat.JPEG, 100, outputStream)
                 }
-                Toast.makeText(context, "이미지가 갤러리에 저장되었습니다.", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "이미지가 갤러리에 저장되었습니다", Toast.LENGTH_SHORT).show()
             }
         } else {
             // URL 이미지를 다운로드
@@ -631,5 +667,40 @@ fun AnimatedRepresentativePhoto(url: String?, isBase64: Boolean = false) {
         } else {
             Text("대표사진 자리", color = Color.Gray)
         }
+    }
+}
+
+// 그룹 썸네일 업로드 함수
+private fun uploadThumbnailToFirestore(
+    imageUri: Uri,
+    groupId: String,
+    firestore: FirebaseFirestore,
+    context: Context,
+    onSuccess: () -> Unit
+) {
+    try {
+        val inputStream = context.contentResolver.openInputStream(imageUri)
+        if (inputStream == null) {
+            Toast.makeText(context, "이미지 파일을 열 수 없습니다", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val bytes = inputStream.readBytes()
+        val base64String = Base64.encodeToString(bytes, Base64.DEFAULT)
+        val updateMap = mapOf(
+            "thumbnailUrl" to base64String,
+            "thumbnailIsBase64" to true
+        )
+        firestore.collection("groups")
+            .document(groupId)
+            .update(updateMap)
+            .addOnSuccessListener {
+                Toast.makeText(context, "썸네일이 저장되었습니다!", Toast.LENGTH_SHORT).show()
+                onSuccess()
+            }
+            .addOnFailureListener { e ->
+                Toast.makeText(context, "썸네일 저장 실패: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+    } catch (e: Exception) {
+        Toast.makeText(context, "썸네일 처리 실패: ${e.message}", Toast.LENGTH_SHORT).show()
     }
 }

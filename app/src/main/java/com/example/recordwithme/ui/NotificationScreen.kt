@@ -18,6 +18,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.DismissDirection
+import androidx.compose.material.DismissValue
+import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.FractionalThreshold
+import androidx.compose.material.SwipeToDismiss
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.Check
@@ -25,6 +30,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsNone
+import androidx.compose.material.rememberDismissState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -406,7 +412,7 @@ fun FriendRequestDialog(
     )
 }
 
-// 메인 NotificationScreen 컴포저블
+@OptIn(ExperimentalMaterialApi::class)
 @Composable
 fun NotificationScreen(
     firestore: FirebaseFirestore = FirebaseFirestore.getInstance()
@@ -754,7 +760,7 @@ fun NotificationScreen(
                 }
         }
     }
-    
+
     // 알림 불러온 후, 잘못된 알림 데이터 삭제
     notifications.forEach { notification ->
         if (
@@ -775,7 +781,7 @@ fun NotificationScreen(
                 .removeValue()
         }
     }
-    
+
     // 알림 목록
     val filteredNotifications = notifications.filter { notification ->
         when (notification.type) {
@@ -841,28 +847,86 @@ fun NotificationScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(vertical = 8.dp)
             ) {
-                items(filteredNotifications) { notification ->
-                    println("NotificationScreen: Rendering notification - type: ${notification.type}")
-                    when (notification.type) {
-                        "friend_request" -> {
-                            FriendRequestItem(
-                                notification = notification,
-                                onAccept = handleAccept,
-                                onReject = handleReject
-                            )
+                items(filteredNotifications, key = { it.id }) { notification ->
+                    val dismissState = rememberDismissState(
+                        confirmStateChange = { dismissValue ->
+                            if (dismissValue == DismissValue.DismissedToEnd || dismissValue == DismissValue.DismissedToStart) {
+                                // 리스트에서 삭제
+                                notifications = notifications.filter { it.id != notification.id }
+                                // DB에서 삭제
+                                when (notification.type) {
+                                    "friend_request" -> {
+                                        firestore.collection("users")
+                                            .document(currentUserId)
+                                            .collection("friendRequests")
+                                            .document(notification.fromUserId)
+                                            .delete()
+                                        FirebaseDatabase.getInstance().reference
+                                            .child("notifications")
+                                            .child(currentUserId)
+                                            .child(notification.id)
+                                            .removeValue()
+                                    }
+                                    "groupInvite" -> {
+                                        firestore.collection("users")
+                                            .document(currentUserId)
+                                            .collection("groupInvites")
+                                            .document(notification.groupId ?: "")
+                                            .delete()
+                                        FirebaseDatabase.getInstance().reference
+                                            .child("notifications")
+                                            .child(currentUserId)
+                                            .child(notification.id)
+                                            .removeValue()
+                                    }
+                                    else -> {
+                                        firestore.collection("users")
+                                            .document(currentUserId)
+                                            .collection("notifications")
+                                            .document(notification.id)
+                                            .delete()
+                                        FirebaseDatabase.getInstance().reference
+                                            .child("notifications")
+                                            .child(currentUserId)
+                                            .child(notification.id)
+                                            .removeValue()
+                                    }
+                                }
+                                true
+                            } else {
+                                false
+                            }
                         }
-                        "groupInvite" -> {
-                            println("NotificationScreen: Rendering group invite item")
-                            GroupInviteItem(
-                                notification = notification,
-                                onAccept = handleGroupInviteAccept,
-                                onReject = handleGroupInviteReject
-                            )
+                    )
+                    SwipeToDismiss(
+                        state = dismissState,
+                        directions = setOf(DismissDirection.EndToStart),
+                        background = {
+                            Box(modifier = Modifier.fillMaxSize())
+                        },
+                        dismissThresholds = { direction -> FractionalThreshold(0.5f) },
+                        dismissContent = {
+                            when (notification.type) {
+                                "friend_request" -> {
+                                    FriendRequestItem(
+                                        notification = notification,
+                                        onAccept = handleAccept,
+                                        onReject = handleReject
+                                    )
+                                }
+                                "groupInvite" -> {
+                                    GroupInviteItem(
+                                        notification = notification,
+                                        onAccept = handleGroupInviteAccept,
+                                        onReject = handleGroupInviteReject
+                                    )
+                                }
+                                else -> {
+                                    GeneralNotificationItem(notification = notification)
+                                }
+                            }
                         }
-                        else -> {
-                            GeneralNotificationItem(notification = notification)
-                        }
-                    }
+                    )
                 }
             }
         }

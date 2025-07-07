@@ -1,38 +1,28 @@
 package com.example.recordwithme
 
+//import NotificationScreen
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material.Scaffold
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.navigation.compose.rememberNavController
-import com.example.recordwithme.ui.BottomNavigationBar
-import com.example.recordwithme.ui.DrawerContainer
-import com.example.recordwithme.ui.GroupScreen
-import com.example.recordwithme.ui.HomeScreen
-import com.example.recordwithme.ui.LoginScreen
-import com.example.recordwithme.ui.NotificationScreen
-import com.example.recordwithme.ui.ProfileScreen
-import com.example.recordwithme.ui.SignUpScreen
-import com.example.recordwithme.ui.TopBar
+import androidx.navigation.compose.*
+import com.example.recordwithme.ui.*
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
@@ -41,25 +31,12 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.ktx.Firebase
+import androidx.compose.ui.Alignment
 
 class MainActivity : ComponentActivity() {
     private lateinit var googleSignInClient: GoogleSignInClient
     private val viewModel: AuthViewModel by viewModels()
     private val auth: FirebaseAuth by lazy { Firebase.auth }
-
-    private val googleSignInLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        val data = result.data
-        try {
-            val task = GoogleSignIn.getSignedInAccountFromIntent(data)
-            val account = task.getResult(ApiException::class.java)!!
-            viewModel.firebaseAuthWithGoogle(account.idToken!!)
-        } catch (e: ApiException) {
-            Log.w("MainActivity", "Google sign in failed", e)
-            viewModel.setUser(null)
-        }
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -84,15 +61,52 @@ class MainActivity : ComponentActivity() {
             val navController = rememberNavController()
             val user by viewModel.authenticatedUser.collectAsState()
             val context = LocalContext.current
+
             var drawerOpen by remember { mutableStateOf(false) }
             val currentBackStackEntry by navController.currentBackStackEntryAsState()
             val currentRoute = currentBackStackEntry?.destination?.route
             val isAuthScreen = currentRoute == "login" || currentRoute == "signup"
 
+            // 다른 탭으로 이동할 때 GroupMode 전역 상태 초기화
+            LaunchedEffect(currentRoute) {
+                if (currentRoute != "profile" && GroupModeState.isGroupMode) {
+                    GroupModeState.isGroupMode = false
+                }
+            }
+
+            // 권한 상태 관리
+            var hasNotificationPermission by remember {
+                mutableStateOf(
+                    Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+                            ContextCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.POST_NOTIFICATIONS
+                            ) == PackageManager.PERMISSION_GRANTED
+                )
+            }
+
+            // 권한 요청 런처
+            val requestPermissionLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.RequestPermission()
+            ) { isGranted: Boolean ->
+                hasNotificationPermission = isGranted
+            }
+
+            // 권한 없으면 요청
+            LaunchedEffect(Unit) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                    && ContextCompat.checkSelfPermission(
+                        context,
+                        Manifest.permission.POST_NOTIFICATIONS
+                    ) != PackageManager.PERMISSION_GRANTED
+                ) {
+                    requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+            }
+
             // 로그인 시 토스트 메시지 표시
             LaunchedEffect(user?.uid) {
                 user?.let { firebaseUser ->
-                    // Firestore에서 사용자 이름 가져오기
                     val db = FirebaseFirestore.getInstance()
                     db.collection("users")
                         .document(firebaseUser.uid)
@@ -101,14 +115,24 @@ class MainActivity : ComponentActivity() {
                             if (document.exists()) {
                                 val userName = document.getString("name") ?: ""
                                 val userId = document.getString("id") ?: ""
-                                val displayName = if (userName.isNotEmpty()) userName else if (userId.isNotEmpty()) "@$userId" else firebaseUser.email ?: "사용자"
-                                Toast.makeText(context, "로그인 성공: $displayName", Toast.LENGTH_SHORT).show()
+                                val displayName =
+                                    if (userName.isNotEmpty()) userName else if (userId.isNotEmpty()) "@$userId" else firebaseUser.email ?: "사용자"
+                                Toast.makeText(context, "로그인 성공: $displayName", Toast.LENGTH_SHORT)
+                                    .show()
                             } else {
-                                Toast.makeText(context, "로그인 성공: ${firebaseUser.email}", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(
+                                    context,
+                                    "로그인 성공: ${firebaseUser.email}",
+                                    Toast.LENGTH_SHORT
+                                ).show()
                             }
                         }
                         .addOnFailureListener {
-                            Toast.makeText(context, "로그인 성공: ${firebaseUser.email}", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(
+                                context,
+                                "로그인 성공: ${firebaseUser.email}",
+                                Toast.LENGTH_SHORT
+                            ).show()
                         }
                 }
             }
@@ -159,9 +183,22 @@ class MainActivity : ComponentActivity() {
                                 SignUpScreen(navController = navController)
                             }
                             composable("home") { HomeScreen() }
-                            composable("profile") { ProfileScreen() }
-                            composable("notification") { NotificationScreen() }
-                            composable("group") { GroupScreen() }
+                            composable("profile") { ProfileScreen(navController = navController) }
+
+                            composable("notification") {
+                                if (hasNotificationPermission) {
+                                    NotificationScreen()
+                                } else {
+                                    Box(
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("알림 권한이 필요합니다.")
+                                    }
+                                }
+                            }
+
+                            composable("group") { GroupScreen(navController = navController) }
                         }
                     }
                 }
@@ -184,5 +221,17 @@ class MainActivity : ComponentActivity() {
         wic.isAppearanceLightNavigationBars = true
     }
 
-
+    private val googleSignInLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val data = result.data
+        try {
+            val task = GoogleSignIn.getSignedInAccountFromIntent(data)
+            val account = task.getResult(ApiException::class.java)!!
+            viewModel.firebaseAuthWithGoogle(account.idToken!!)
+        } catch (e: ApiException) {
+            Log.w("MainActivity", "Google sign in failed", e)
+            viewModel.setUser(null)
+        }
+    }
 }

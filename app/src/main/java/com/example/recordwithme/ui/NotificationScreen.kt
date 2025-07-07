@@ -1,52 +1,61 @@
 package com.example.recordwithme.ui
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.runtime.DisposableEffect
-import android.util.Log
+//Android 기본
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.ContextCompat
-import androidx.core.app.NotificationCompat
-import androidx.core.app.NotificationManagerCompat
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import android.util.Log
+
+// Firebase
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.*
+import com.google.firebase.firestore.FirebaseFirestore
+
+//날짜 포맷
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+// Jetpack Compose - 기본
+import androidx.compose.runtime.*
+import androidx.compose.ui.*
+import androidx.compose.ui.unit.*
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.database.DataSnapshot
-import com.google.firebase.database.DatabaseError
-import com.google.firebase.database.ValueEventListener
-import kotlinx.coroutines.tasks.await
-import java.text.SimpleDateFormat
-import java.util.*
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.*
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.*
+import androidx.compose.foundation.lazy.*
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.IntOffset
+
+// Jetpack Compose - Material3
+import androidx.compose.material3.*
+
+// Jetpack Compose - Icons
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+
+// Animation
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.layout.offset
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.IntOffset
+
+//Permissions
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+
+//Notification
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
+
 import kotlin.math.roundToInt
+
 
 // 알림 데이터 클래스
 data class Notification(
@@ -184,11 +193,11 @@ fun SwipeableGeneralNotificationItem(
         animationSpec = tween(durationMillis = 200),
         label = "swipe"
     )
-    
+
     val density = LocalDensity.current
     val screenWidth = with(density) { 400.dp.toPx() } // 대략적인 카드 너비
     val deleteThreshold = -screenWidth / 2 // 절반까지 슬라이드하면 삭제
-    
+
     // 알림 카드
     Card(
         modifier = Modifier
@@ -330,7 +339,7 @@ fun NotificationScreen(
             Log.d("NotificationScreen", "알림 권한 거부됨")
         }
     }
-    
+
     // 권한 확인 및 요청
     LaunchedEffect(Unit) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -345,7 +354,7 @@ fun NotificationScreen(
             }
         }
     }
-    
+
     // Realtime Database 리스너 설정
     DisposableEffect(currentUserId) {
         val realtimeDb = FirebaseDatabase.getInstance().reference
@@ -363,7 +372,7 @@ fun NotificationScreen(
                     val timestamp = childSnapshot.child("timestamp").getValue(Long::class.java) ?: continue
                     
                     Log.d("NotificationScreen", "친구 요청 발견: $fromUserName ($fromUserId)")
-                    
+
                     val notification = Notification(
                         id = childSnapshot.key ?: "",
                         type = "friend_request",
@@ -371,9 +380,9 @@ fun NotificationScreen(
                         fromUserName = fromUserName,
                         timestamp = timestamp
                     )
-                    
+
                     newNotifications.add(notification)
-                    
+
                     // 시스템 알림 표시
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                         if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
@@ -383,14 +392,14 @@ fun NotificationScreen(
                                 .setContentText("${fromUserName}님이 친구 요청을 보냈습니다")
                                 .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                                 .setAutoCancel(true)
-                            
+
                             with(NotificationManagerCompat.from(context)) {
                                 notify(System.currentTimeMillis().toInt(), builder.build())
                             }
                             Log.d("NotificationScreen", "시스템 알림 표시: ${fromUserName}")
                         }
                     }
-                    
+
                     // Realtime Database에서 감지한 친구 요청을 Firestore에도 저장
                     firestore.collection("users")
                         .document(currentUserId)
@@ -435,9 +444,9 @@ fun NotificationScreen(
                         // 모든 알림을 합치고 시간순으로 정렬
                         val allNotifications = (newNotifications + firestoreNotifications)
                             .sortedByDescending { it.timestamp }
-                        
+
                         Log.d("NotificationScreen", "총 ${allNotifications.size}개 알림 (Realtime: ${newNotifications.size}, Firestore: ${firestoreNotifications.size})")
-                        
+
                         // 중복 제거 (같은 ID의 알림이 있을 경우)
                         val uniqueNotifications = allNotifications.distinctBy { it.id }
                         notifications = uniqueNotifications
@@ -479,20 +488,20 @@ fun NotificationScreen(
                         android.widget.Toast.makeText(context, "이미 친구입니다", android.widget.Toast.LENGTH_SHORT).show()
                         return@addOnSuccessListener
                     }
-                    
+
                     // Firestore에 친구 관계 추가
                     val friendData = mapOf(
                         "name" to notification.fromUserName,
                         "addedAt" to System.currentTimeMillis()
                     )
-                    
+
                     // 현재 사용자의 친구 목록에 추가
                     firestore.collection("users")
                         .document(currentUserId)
                         .collection("friends")
                         .document(notification.fromUserId)
                         .set(friendData)
-                    
+
                     // 현재 사용자의 실제 이름 가져오기
                     firestore.collection("users")
                         .document(currentUserId)
@@ -509,7 +518,7 @@ fun NotificationScreen(
                             } else {
                                 auth.currentUser?.displayName ?: auth.currentUser?.email ?: currentUserId
                             }
-                            
+
                             // 요청한 사용자의 친구 목록에도 추가
                             firestore.collection("users")
                                 .document(notification.fromUserId)
@@ -538,20 +547,20 @@ fun NotificationScreen(
                                     "addedAt" to System.currentTimeMillis()
                                 ))
                         }
-                    
+
                     // 친구 요청 삭제 (양쪽에서)
                     firestore.collection("users")
                         .document(currentUserId)
                         .collection("friendRequests")
                         .document(notification.fromUserId)
                         .delete()
-                    
+
                     firestore.collection("users")
                         .document(notification.fromUserId)
                         .collection("friendRequests")
                         .document(currentUserId)
                         .delete()
-                    
+
                     // Realtime Database에서도 삭제
                     FirebaseDatabase.getInstance().reference
                         .child("notifications")
@@ -564,7 +573,7 @@ fun NotificationScreen(
                         .addOnFailureListener { e ->
                             Log.e("NotificationScreen", "Realtime Database 알림 삭제 실패: ${e.message}")
                         }
-                    
+
                     // 친구 요청 수락 알림을 상대방에게만 보냄
                     if (notification.fromUserId != currentUserId) {
                         val acceptNotification = mapOf(
@@ -578,7 +587,7 @@ fun NotificationScreen(
                             .collection("notifications")
                             .add(acceptNotification)
                     }
-                    
+
                     // Firestore에서도 알림 삭제
                     firestore.collection("users")
                         .document(currentUserId)
@@ -591,11 +600,11 @@ fun NotificationScreen(
                         .addOnFailureListener { e ->
                             Log.e("NotificationScreen", "Firestore 알림 삭제 실패: ${e.message}")
                         }
-                    
+
                     // UI에서 알림 제거
                     notifications = notifications.filter { it.id != notification.id }
                     android.widget.Toast.makeText(context, "친구 요청을 수락했습니다", android.widget.Toast.LENGTH_SHORT).show()
-                    
+
                 }
                 .addOnFailureListener { e ->
                     android.widget.Toast.makeText(context, "오류가 발생했습니다: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
@@ -615,13 +624,13 @@ fun NotificationScreen(
                 .collection("friendRequests")
                 .document(notification.fromUserId)
                 .delete()
-            
+
             firestore.collection("users")
                 .document(notification.fromUserId)
                 .collection("friendRequests")
                 .document(currentUserId)
                 .delete()
-            
+
             // Realtime Database에서도 삭제
             FirebaseDatabase.getInstance().reference
                 .child("notifications")
@@ -634,7 +643,7 @@ fun NotificationScreen(
                 .addOnFailureListener { e ->
                     Log.e("NotificationScreen", "Realtime Database 알림 삭제 실패: ${e.message}")
                 }
-            
+
             // 거절 알림을 요청한 사용자에게 전송 (Firestore만)
             val rejectNotification = mapOf(
                 "type" to "friend_rejected",
@@ -669,7 +678,7 @@ fun NotificationScreen(
             android.widget.Toast.makeText(context, "오류가 발생했습니다: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
         }
     }
-    
+
     // 일반 알림 삭제 처리
     val handleDeleteNotification = { notification: Notification ->
         try {
@@ -715,7 +724,7 @@ fun NotificationScreen(
         // 알림 목록
         if (loading) {
             Box(
-                modifier = Modifier.fillMaxSize(),  
+                modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
                 CircularProgressIndicator()

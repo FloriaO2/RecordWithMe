@@ -14,12 +14,29 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityOptionsCompat
 import com.example.recordwithme.R
 import java.util.Calendar
+import com.bumptech.glide.Glide
+import com.bumptech.glide.request.target.CustomTarget
+import com.bumptech.glide.request.transition.Transition
+import android.graphics.drawable.Drawable
+import com.google.firebase.firestore.FirebaseFirestore
+import android.graphics.drawable.ColorDrawable
+import android.util.Base64
+import android.graphics.BitmapFactory
+import android.graphics.drawable.BitmapDrawable
+import android.view.Gravity as AndroidGravity
+import android.app.Activity
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.ActivityResultLauncher
+import android.widget.FrameLayout
+import android.util.TypedValue
+import android.widget.ImageView
 
 class GroupCalendarActivity : AppCompatActivity() {
     private var year = 2024 
     private var month = 7 // 1~12
     private var groupId: String = ""
     private var groupName: String = ""
+    private lateinit var dayDetailLauncher: ActivityResultLauncher<Intent>
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -83,28 +100,94 @@ class GroupCalendarActivity : AppCompatActivity() {
             for (i in 1..lastDay) days.add(i)
             while (days.size < 42) days.add(null)
 
+            val firestore = FirebaseFirestore.getInstance()
+
             // 날짜 셀 추가
-            for (d in days) {
-                val tv = TextView(this)
-                tv.text = d?.toString() ?: ""
-                tv.gravity = Gravity.CENTER
-                tv.textSize = 18f
-                tv.setTextColor(Color.BLACK)
-                tv.setBackgroundColor(if (d == null) Color.TRANSPARENT else Color.WHITE)
+            for ((index, d) in days.withIndex()) {
+                val row = index / 7
+                val col = index % 7
+                val cell = FrameLayout(this)
+                val imageView = ImageView(this).apply {
+                    val px = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 80f, resources.displayMetrics).toInt()
+                    layoutParams = FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        px,
+                        Gravity.CENTER
+                    )
+                    scaleType = ImageView.ScaleType.CENTER_CROP
+                    setBackgroundColor(if (d == null) Color.TRANSPARENT else Color.WHITE)
+                    alpha = 0.8f
+                }
+                val textView = TextView(this).apply {
+                    text = d?.toString() ?: ""
+                    gravity = Gravity.CENTER
+                    textSize = 20f
+                    setTextColor(Color.BLACK)
+                    setPadding(0, 0, 0, 0)
+                    layoutParams = FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        FrameLayout.LayoutParams.MATCH_PARENT
+                    )
+                }
+                cell.addView(imageView)
+                cell.addView(textView)
                 val params = GridLayout.LayoutParams()
                 params.width = 0
-                params.height = GridLayout.LayoutParams.WRAP_CONTENT
-                params.columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
-                params.rowSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
+                params.height = 0
+                params.columnSpec = GridLayout.spec(col, 1f)
+                params.rowSpec = GridLayout.spec(row, 0.5f)
                 params.setMargins(4, 4, 4, 4)
-                tv.layoutParams = params
+                cell.layoutParams = params
                 
                 // 날짜 셀 클릭 시 Shared Element Transition으로 DayDetailActivity 전환
                 if (d != null) {
                     // transitionName 설정
-                    tv.transitionName = "calendar_cell_${year}_${month}_$d"
-                    
-                    tv.setOnClickListener {
+                    textView.transitionName = "calendar_cell_${year}_${month}_$d"
+
+                    // Firestore에서 해당 날짜의 최신 사진 1장만 쿼리 (DayDetailActivity와 동일)
+                    val dateString = "${year}년 ${month}월 ${d}일"
+                    firestore.collection("groups").document(groupId)
+                        .collection("photos")
+                        .whereEqualTo("date", dateString)
+                        .orderBy("uploadedAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                        .limit(1)
+                        .get()
+                        .addOnSuccessListener { querySnapshot ->
+                            val doc = querySnapshot.documents.firstOrNull()
+                            if (doc != null) {
+                                val isBase64 = doc.getBoolean("isBase64") ?: false
+                                val imageUrl = doc.getString("url")
+                                if (!imageUrl.isNullOrEmpty()) {
+                                    if (isBase64) {
+                                        try {
+                                            val imageBytes = Base64.decode(imageUrl, Base64.DEFAULT)
+                                            val bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+                                            imageView.setImageBitmap(bitmap)
+                                        } catch (e: Exception) {
+                                            imageView.setImageDrawable(null)
+                                            imageView.setBackgroundColor(Color.WHITE)
+                                        }
+                                    } else {
+                                        Glide.with(this)
+                                            .load(imageUrl)
+                                            .centerCrop()
+                                            .into(imageView)
+                                    }
+                                } else {
+                                    imageView.setImageDrawable(null)
+                                    imageView.setBackgroundColor(Color.WHITE)
+                                }
+                            } else {
+                                imageView.setImageDrawable(null)
+                                imageView.setBackgroundColor(Color.WHITE)
+                            }
+                        }
+                        .addOnFailureListener {
+                            imageView.setImageDrawable(null)
+                            imageView.setBackgroundColor(Color.WHITE)
+                        }
+
+                    cell.setOnClickListener {
                         val intent = Intent(this, DayDetailActivity::class.java)
                         intent.putExtra("day", d)
                         intent.putExtra("year", year)
@@ -112,27 +195,21 @@ class GroupCalendarActivity : AppCompatActivity() {
                         intent.putExtra("groupId", groupId)
                         intent.putExtra("groupName", groupName)
                         intent.putExtra("transitionName", "calendar_cell_${year}_${month}_$d")
-                        
-                        // Android 5.0 이상에서만 Shared Element Transition 적용
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                             val options = ActivityOptionsCompat.makeSceneTransitionAnimation(
                                 this,
-                                tv,
+                                textView,
                                 "calendar_cell_${year}_${month}_$d"
                             )
-                            
-                            // 전환 애니메이션 설정
-                            startActivity(intent, options.toBundle())
-                            
-                            // 전환 중에 배경이 사라지지 않도록 설정
+                            dayDetailLauncher.launch(intent, options)
                             window.allowEnterTransitionOverlap = false
                             window.allowReturnTransitionOverlap = false
                         } else {
-                            startActivity(intent)
+                            dayDetailLauncher.launch(intent)
                         }
                     }
                 }
-                grid.addView(tv)
+                grid.addView(cell)
             }
         }
 
@@ -163,6 +240,14 @@ class GroupCalendarActivity : AppCompatActivity() {
         // 뒤로가기 버튼 클릭 리스너 연결
         findViewById<Button>(R.id.btnBack).setOnClickListener {
             onBackPressedDispatcher.onBackPressed()
+        }
+
+        dayDetailLauncher = registerForActivityResult(
+            ActivityResultContracts.StartActivityForResult()
+        ) { result ->
+            if (result.resultCode == Activity.RESULT_OK) {
+                updateCalendar()
+            }
         }
 
         updateCalendar()

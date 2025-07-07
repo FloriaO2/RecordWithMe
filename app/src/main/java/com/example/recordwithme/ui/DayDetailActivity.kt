@@ -482,8 +482,7 @@ class DayDetailActivity : AppCompatActivity() {
     // Storage에 업로드 후 Firestore에 저장 → Base64로 Firestore에 직접 저장
     private fun uploadImageToFirebase(imageUri: Uri) {
         val context = this
-        val calendar = java.util.Calendar.getInstance()
-        val dateString = "${calendar.get(java.util.Calendar.YEAR)}년 ${calendar.get(java.util.Calendar.MONTH) + 1}월 ${calendar.get(java.util.Calendar.DAY_OF_MONTH)}일"
+        val dateString = "${year}년 ${month}월 ${day}일"
         try {
             val inputStream: InputStream? = contentResolver.openInputStream(imageUri)
             if (inputStream == null) {
@@ -507,6 +506,7 @@ class DayDetailActivity : AppCompatActivity() {
                 .add(photoData)
                 .addOnSuccessListener {
                     android.widget.Toast.makeText(context, "사진이 추가되었습니다", android.widget.Toast.LENGTH_SHORT).show()
+                    setResult(RESULT_OK)
                     loadPhotosFunc()
                 }
                 .addOnFailureListener { e ->

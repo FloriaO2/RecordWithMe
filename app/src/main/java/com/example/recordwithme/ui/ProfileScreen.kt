@@ -57,6 +57,8 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 import com.google.firebase.database.FirebaseDatabase
+import android.util.Log
+import androidx.compose.ui.platform.LocalContext
 
 // 데이터 클래스들
 data class Friend(val id: String, val name: String, val mutual: String) {
@@ -218,39 +220,90 @@ fun FriendSearchDialog(
                                     }
                                     Button(
                                         onClick = {
-                                            val requestData = mapOf(
-                                                "fromUserId" to currentUserId,
-                                                "fromUserName" to (currentUserEmail ?: currentUserId),
-                                                "timestamp" to System.currentTimeMillis()
-                                            )
-
-                                            // Firestore에 친구 신청 저장
+                                            // 이미 친구 요청을 보냈는지 확인
                                             firestore.collection("users")
                                                 .document(user.id)
                                                 .collection("friendRequests")
                                                 .document(currentUserId)
-                                                .set(requestData)
-                                                .addOnSuccessListener {
-                                                    // ✅ Realtime Database에도 저장 (알림용)
-                                                    val realtimeDb = FirebaseDatabase.getInstance().reference
-                                                    realtimeDb.child("notifications")
-                                                        .child(user.id)  // 수신자 ID 경로
-                                                        .push()
-                                                        .setValue(requestData)
+                                                .get()
+                                                .addOnSuccessListener { doc ->
+                                                    if (doc.exists()) {
+                                                        android.widget.Toast.makeText(
+                                                            context,
+                                                            "이미 친구 요청을 보냈습니다",
+                                                            android.widget.Toast.LENGTH_SHORT
+                                                        ).show()
+                                                        return@addOnSuccessListener
+                                                    }
+                                                    
+                                                    // 이미 친구인지 확인
+                                                    firestore.collection("users")
+                                                        .document(currentUserId)
+                                                        .collection("friends")
+                                                        .document(user.id)
+                                                        .get()
+                                                        .addOnSuccessListener { friendDoc ->
+                                                            if (friendDoc.exists()) {
+                                                                android.widget.Toast.makeText(
+                                                                    context,
+                                                                    "이미 친구입니다",
+                                                                    android.widget.Toast.LENGTH_SHORT
+                                                                ).show()
+                                                                return@addOnSuccessListener
+                                                            }
+                                                            
+                                                            // 친구 요청 전송
+                                                            val requestData = mapOf(
+                                                                "fromUserId" to currentUserId,
+                                                                "fromUserName" to (currentUserEmail ?: currentUserId),
+                                                                "timestamp" to System.currentTimeMillis()
+                                                            )
 
-                                                    android.widget.Toast.makeText(
-                                                        context,
-                                                        "친구 요청을 보냈습니다",
-                                                        android.widget.Toast.LENGTH_SHORT
-                                                    ).show()
-                                                    onDismiss()
-                                                }
-                                                .addOnFailureListener { e ->
-                                                    android.widget.Toast.makeText(
-                                                        context,
-                                                        "친구 추가에 실패했습니다: ${e.message}",
-                                                        android.widget.Toast.LENGTH_SHORT
-                                                    ).show()
+                                                            Log.d("ProfileScreen", "친구 요청 전송 시작: ${user.id}에게")
+
+                                                            // Firestore에 친구 신청 저장
+                                                            firestore.collection("users")
+                                                                .document(user.id)
+                                                                .collection("friendRequests")
+                                                                .document(currentUserId)
+                                                                .set(requestData)
+                                                                .addOnSuccessListener {
+                                                                    Log.d("ProfileScreen", "Firestore 친구 요청 저장 성공")
+                                                                    
+                                                                    // ✅ Realtime Database에도 저장 (알림용)
+                                                                    val realtimeDb = FirebaseDatabase.getInstance().reference
+                                                                    val notificationRef = realtimeDb.child("notifications").child(user.id)
+                                                                    
+                                                                    Log.d("ProfileScreen", "Realtime Database 경로: notifications/${user.id}")
+                                                                    
+                                                                    notificationRef.push().setValue(requestData)
+                                                                        .addOnSuccessListener {
+                                                                            Log.d("ProfileScreen", "Realtime Database 알림 저장 성공")
+                                                                            android.widget.Toast.makeText(
+                                                                                context,
+                                                                                "친구 요청을 보냈습니다",
+                                                                                android.widget.Toast.LENGTH_SHORT
+                                                                            ).show()
+                                                                            onDismiss()
+                                                                        }
+                                                                        .addOnFailureListener { e ->
+                                                                            Log.e("ProfileScreen", "Realtime Database 저장 실패: ${e.message}")
+                                                                            android.widget.Toast.makeText(
+                                                                                context,
+                                                                                "알림 저장에 실패했습니다: ${e.message}",
+                                                                                android.widget.Toast.LENGTH_SHORT
+                                                                            ).show()
+                                                                        }
+                                                                }
+                                                                .addOnFailureListener { e ->
+                                                                    Log.e("ProfileScreen", "Firestore 친구 요청 저장 실패: ${e.message}")
+                                                                    android.widget.Toast.makeText(
+                                                                        context,
+                                                                        "친구 추가에 실패했습니다: ${e.message}",
+                                                                        android.widget.Toast.LENGTH_SHORT
+                                                                    ).show()
+                                                                }
+                                                        }
                                                 }
                                         },
                                         shape = RoundedCornerShape(12.dp),
@@ -282,6 +335,7 @@ fun ProfileScreen(
     val currentUser = auth.currentUser ?: return
     val currentUserId = currentUser.uid
     val currentUserEmail = currentUser.email
+    val context = LocalContext.current
 
     var showFriendDialog by remember { mutableStateOf(false) }
     var showGroupDialog by remember { mutableStateOf(false) }
@@ -326,11 +380,39 @@ fun ProfileScreen(
                 .collection("friends")
                 .get()
                 .await()
-            friends = snapshot.documents.mapNotNull { doc ->
-                val id = doc.id
-                val name = doc.getString("name") ?: return@mapNotNull null
-                Friend(id, name, "친구")
+            
+            // 친구 정보를 병렬로 가져오기
+            val friendsList = mutableListOf<Friend>()
+            for (doc in snapshot.documents) {
+                val friendId = doc.id
+                val localName = doc.getString("name") ?: continue
+                
+                try {
+                    // 상대방의 실제 정보 가져오기
+                    val friendUserDoc = firestore.collection("users")
+                        .document(friendId)
+                        .get()
+                        .await()
+                    
+                    val actualName = if (friendUserDoc.exists()) {
+                        val friendName = friendUserDoc.getString("name")
+                        val friendId = friendUserDoc.getString("id")
+                        when {
+                            !friendName.isNullOrBlank() -> friendName
+                            !friendId.isNullOrBlank() -> friendId
+                            else -> localName
+                        }
+                    } else {
+                        localName
+                    }
+                    
+                    friendsList.add(Friend(friendId, actualName, "친구"))
+                } catch (e: Exception) {
+                    // 상대방 정보를 가져올 수 없으면 로컬 이름 사용
+                    friendsList.add(Friend(friendId, localName, "친구"))
+                }
             }
+            friends = friendsList
         } catch (_: Exception) {}
     }
 
@@ -503,10 +585,44 @@ fun ProfileScreen(
                             isSelected = isSelected,
                             groupMode = groupMode,
                             onRemoveClick = { toRemove ->
-                                firestore.collection("users").document(currentUserId)
-                                    .collection("friends").document(toRemove.id).delete()
-                                friends = friends.filter { it.id != toRemove.id }
-                                selectedFriendIds.remove(toRemove.id)
+                                // 양쪽에서 친구 관계 삭제
+                                firestore.collection("users")
+                                    .document(currentUserId)
+                                    .collection("friends")
+                                    .document(toRemove.id)
+                                    .delete()
+                                    .addOnSuccessListener {
+                                        // 상대방의 친구 목록에서도 삭제
+                                        firestore.collection("users")
+                                            .document(toRemove.id)
+                                            .collection("friends")
+                                            .document(currentUserId)
+                                            .delete()
+                                            .addOnSuccessListener {
+                                                // UI 업데이트
+                                                friends = friends.filter { it.id != toRemove.id }
+                                                selectedFriendIds.remove(toRemove.id)
+                                                android.widget.Toast.makeText(
+                                                    context,
+                                                    "${toRemove.name}님을 친구 목록에서 삭제했습니다",
+                                                    android.widget.Toast.LENGTH_SHORT
+                                                ).show()
+                                            }
+                                            .addOnFailureListener { e ->
+                                                android.widget.Toast.makeText(
+                                                    context,
+                                                    "친구 삭제 중 오류가 발생했습니다: ${e.message}",
+                                                    android.widget.Toast.LENGTH_SHORT
+                                                ).show()
+                                            }
+                                    }
+                                    .addOnFailureListener { e ->
+                                        android.widget.Toast.makeText(
+                                            context,
+                                            "친구 삭제 중 오류가 발생했습니다: ${e.message}",
+                                            android.widget.Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
                             }
                         )
                     }

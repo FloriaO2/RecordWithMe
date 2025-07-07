@@ -4,7 +4,6 @@ import android.Manifest
 import android.app.DownloadManager
 import android.content.Context
 import android.content.pm.PackageManager
-import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Environment
 import android.widget.Toast
@@ -15,7 +14,6 @@ import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.with
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -38,11 +36,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import com.google.accompanist.flowlayout.FlowRow
@@ -524,26 +520,6 @@ private fun uploadImageToFirebase(
             Toast.LENGTH_SHORT
         ).show()
         onSuccess(false)
-    }
-}
-
-@Composable
-fun ContentUriImage(uriString: String, modifier: Modifier = Modifier) {
-    val context = LocalContext.current
-    var bitmap by remember(uriString) { mutableStateOf<android.graphics.Bitmap?>(null) }
-
-    LaunchedEffect(uriString) {
-        val resolver = context.contentResolver
-        val inputStream = resolver.openInputStream(Uri.parse(uriString))
-        bitmap = inputStream?.use { BitmapFactory.decodeStream(it) }
-    }
-
-    if (bitmap != null) {
-        Image(bitmap = bitmap!!.asImageBitmap(), contentDescription = null, modifier = modifier)
-    } else {
-        Box(modifier = modifier.background(Color.LightGray), contentAlignment = Alignment.Center) {
-            Text("이미지")
-        }
     }
 }
 

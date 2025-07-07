@@ -103,8 +103,24 @@ fun SignUpScreen(navController: NavController) {
                     Spacer(modifier = Modifier.height(32.dp))
                     Button(
                         onClick = {
-                            if (id.isNotBlank()) step = 3
-                            else Toast.makeText(context, "아이디를 입력하세요.", Toast.LENGTH_SHORT).show()
+                            if (id.isBlank()) {
+                                Toast.makeText(context, "아이디를 입력하세요.", Toast.LENGTH_SHORT).show()
+                            } else {
+                                // 아이디 중복 체크
+                                db.collection("users")
+                                    .whereEqualTo("id", id)
+                                    .get()
+                                    .addOnSuccessListener { documents ->
+                                        if (documents.isEmpty) {
+                                            step = 3
+                                        } else {
+                                            Toast.makeText(context, "이미 사용 중인 아이디입니다.", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                    .addOnFailureListener {
+                                        Toast.makeText(context, "아이디 확인 중 오류가 발생했습니다.", Toast.LENGTH_SHORT).show()
+                                    }
+                            }
                         },
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFFFC0CB)),
@@ -171,7 +187,6 @@ fun SignUpScreen(navController: NavController) {
                                             val errorMessage = when (task.exception) {
                                                 is com.google.firebase.auth.FirebaseAuthWeakPasswordException -> "비밀번호가 너무 약합니다."
                                                 is com.google.firebase.auth.FirebaseAuthInvalidCredentialsException -> "올바르지 않은 아이디 형식입니다."
-                                                is com.google.firebase.auth.FirebaseAuthUserCollisionException -> "이미 사용 중인 아이디입니다."
                                                 else -> "회원가입 실패: ${task.exception?.message}"
                                             }
                                             Toast.makeText(context, errorMessage, Toast.LENGTH_SHORT).show()

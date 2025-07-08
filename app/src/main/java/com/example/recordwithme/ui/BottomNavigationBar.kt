@@ -33,6 +33,10 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
 
 @Composable
 fun BottomNavigationBar(navController: NavController) {
@@ -46,25 +50,40 @@ fun BottomNavigationBar(navController: NavController) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     
-    // 알림 개수 상태
-    var notificationCount by remember { mutableStateOf(0) }
+    // 알림 존재 여부 상태
+    var hasNotification by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
     
-    // 알림 개수 실시간 구독 (중복 제거)
+    // Firestore, Realtime DB 리스너 관리
     var firestoreListener by remember { mutableStateOf<com.google.firebase.firestore.ListenerRegistration?>(null) }
-    
+    var realtimeListener by remember { mutableStateOf<ValueEventListener?>(null) }
+    val realtimeDb = remember { FirebaseDatabase.getInstance().reference }
+
     LaunchedEffect(currentUserId) {
         if (currentUserId != null) {
             val firestore = FirebaseFirestore.getInstance()
-            
-            // Firestore 알림만 구독 (친구 요청, 그룹 초대는 notifications 컬렉션에 포함됨)
+            // Firestore 알림 구독
             firestoreListener = firestore.collection("users")
                 .document(currentUserId)
                 .collection("notifications")
                 .addSnapshotListener { snapshot, _ ->
-                    notificationCount = snapshot?.size() ?: 0
+                    val firestoreHas = (snapshot?.isEmpty == false)
+                    // Realtime DB 쪽은 아래에서 처리
+                    hasNotification = hasNotification || firestoreHas
                 }
+            // Realtime DB 알림 구독
+            val notificationsRef = realtimeDb.child("notifications").child(currentUserId)
+            val listener = object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    val realtimeHas = snapshot.children.any() // 하나라도 있으면 true
+                    // Firestore 쪽은 위에서 처리
+                    hasNotification = hasNotification || realtimeHas
+                }
+                override fun onCancelled(error: DatabaseError) {}
+            }
+            notificationsRef.addValueEventListener(listener)
+            realtimeListener = listener
         }
     }
     
@@ -72,6 +91,9 @@ fun BottomNavigationBar(navController: NavController) {
     DisposableEffect(currentUserId) {
         onDispose {
             firestoreListener?.remove()
+            if (currentUserId != null && realtimeListener != null) {
+                FirebaseDatabase.getInstance().reference.child("notifications").child(currentUserId).removeEventListener(realtimeListener!!)
+            }
         }
     }
 
@@ -106,9 +128,8 @@ fun BottomNavigationBar(navController: NavController) {
                                 modifier = Modifier.size(29.dp),
                                 tint = if (currentRoute == item.route) Color(0xFF5A6CEA) else Color(0xFFB0B8C1)
                             )
-                            
-                            // 알림 아이콘에만 뱃지 표시
-                            if (item.route == "notification" && notificationCount > 0) {
+                            // 알림 아이콘에만 '!' 표시
+                            if (item.route == "notification" && hasNotification) {
                                 Box(
                                     modifier = Modifier
                                         .size(16.dp)
@@ -117,9 +138,9 @@ fun BottomNavigationBar(navController: NavController) {
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
-                                        text = if (notificationCount > 99) "99+" else notificationCount.toString(),
+                                        text = "!",
                                         color = Color.White,
-                                        fontSize = 10.sp,
+                                        fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold
                                     )
                                 }

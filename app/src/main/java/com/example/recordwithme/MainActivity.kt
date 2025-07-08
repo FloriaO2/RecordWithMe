@@ -33,11 +33,18 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.ktx.Firebase
 import androidx.compose.ui.Alignment
 import android.view.View
+import net.openid.appauth.*
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKeys
+import android.net.Uri
+import android.content.Intent
 
 class MainActivity : ComponentActivity() {
     private lateinit var googleSignInClient: GoogleSignInClient
     private val viewModel: AuthViewModel by viewModels()
     private val auth: FirebaseAuth by lazy { Firebase.auth }
+    private lateinit var authService: AuthorizationService
+    private val AUTH_REQUEST_CODE = 1002
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -232,5 +239,62 @@ class MainActivity : ComponentActivity() {
         val controller = WindowInsetsControllerCompat(window, window.decorView)
         controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         controller.hide(android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.navigationBars())
+    }
+
+    fun startSpotifyAuth() {
+        val serviceConfig = AuthorizationServiceConfiguration(
+            Uri.parse("https://accounts.spotify.com/authorize"),
+            Uri.parse("https://accounts.spotify.com/api/token")
+        )
+        val authRequest = AuthorizationRequest.Builder(
+            serviceConfig,
+            "a3809a063b6345fc86e05539e4668b3a", // 본인 Client ID
+            ResponseTypeValues.CODE,
+            Uri.parse("com.example.recordwithme://callback")
+        )
+            .setScopes("user-read-private", "user-read-email", "streaming")
+            .build()
+        authService = AuthorizationService(this)
+        val authIntent = authService.getAuthorizationRequestIntent(authRequest)
+        startActivityForResult(authIntent, AUTH_REQUEST_CODE)
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == AUTH_REQUEST_CODE) {
+            val response = AuthorizationResponse.fromIntent(data!!)
+            val ex = AuthorizationException.fromIntent(data)
+            if (response != null) {
+                authService.performTokenRequest(response.createTokenExchangeRequest()) { tokenResponse, tokenEx ->
+                    authService.dispose()
+                    if (tokenResponse != null) {
+                        val accessToken = tokenResponse.accessToken
+                        val refreshToken = tokenResponse.refreshToken
+                        // EncryptedSharedPreferences에 저장
+                        val masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
+                        val prefs = EncryptedSharedPreferences.create(
+                            "spotify_prefs",
+                            masterKeyAlias,
+                            applicationContext,
+                            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+                        )
+                        prefs.edit().putString("access_token", accessToken).apply()
+                        prefs.edit().putString("refresh_token", refreshToken).apply()
+                        runOnUiThread {
+                            Toast.makeText(this, "AccessToken 저장 완료!", Toast.LENGTH_LONG).show()
+                        }
+                    } else {
+                        runOnUiThread {
+                            Toast.makeText(this, "토큰 교환 실패: ${tokenEx?.localizedMessage}", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
+            } else if (ex != null) {
+                Toast.makeText(this, "인증 실패: ${ex.errorDescription}", Toast.LENGTH_LONG).show()
+            } else {
+                Toast.makeText(this, "인증 결과 없음", Toast.LENGTH_LONG).show()
+            }
+        }
     }
 }

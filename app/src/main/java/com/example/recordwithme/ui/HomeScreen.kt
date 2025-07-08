@@ -79,8 +79,15 @@ import com.google.accompanist.flowlayout.FlowRow
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
 import kotlinx.coroutines.tasks.await
-import java.util.Calendar
+import java.util.*
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import com.example.recordwithme.MainActivity
 
 data class Photo(val url: String, val date: String, val isBase64: Boolean = false)
 data class Group(
@@ -318,9 +325,16 @@ fun HomeScreen() {
                     Text("가장 먼저 사진을 업로드해보세요!", color = Color.Gray)
                 }
             } else {
+                val dateFormatter = DateTimeFormatter.ofPattern("yyyy년 M월 d일", Locale.KOREAN)
                 val photosByDate = photosToShow.groupBy { it.date }
                     .toList()
-                    .sortedByDescending { it.first } // 날짜 내림차순 정렬
+                    .sortedByDescending { (dateStr, _) ->
+                        try {
+                            LocalDate.parse(dateStr, dateFormatter)
+                        } catch (e: Exception) {
+                            LocalDate.MIN
+                        }
+                    }
                 val representativePhoto = photosToShow.firstOrNull()
                 LazyColumn(
                     modifier = Modifier
@@ -431,7 +445,7 @@ fun HomeScreen() {
                 Icon(Icons.Filled.Add, contentDescription = "사진 추가", modifier = Modifier.size(32.dp))
             }
         }
-        
+
 
 
         if (selectedPhotoUrl != null) {
@@ -560,6 +574,16 @@ fun HomeScreen() {
                     }
                 }
             }
+        }
+
+        // 예시: 화면 하단에 Spotify 로그인 버튼 추가
+        FloatingActionButton(
+            onClick = { (context as? MainActivity)?.startSpotifyAuth() },
+            containerColor = Color(0xFF1DB954),
+            contentColor = Color.White,
+            modifier = Modifier.align(Alignment.BottomStart).padding(24.dp).size(64.dp)
+        ) {
+            Text("Spotify", color = Color.White)
         }
     }
 }

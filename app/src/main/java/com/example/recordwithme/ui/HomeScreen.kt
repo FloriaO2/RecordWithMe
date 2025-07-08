@@ -75,19 +75,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
+import com.example.recordwithme.MainActivity
 import com.google.accompanist.flowlayout.FlowRow
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.input.pointer.pointerInput
 import kotlinx.coroutines.tasks.await
-import java.util.*
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import com.example.recordwithme.MainActivity
+import java.util.Calendar
+import java.util.Locale
 
 data class Photo(val url: String, val date: String, val isBase64: Boolean = false)
 data class Group(
@@ -348,12 +345,13 @@ fun HomeScreen() {
                         ) {
                             Card(
                                 modifier = Modifier.fillMaxSize(),
+                                shape = RoundedCornerShape(0.dp),
                                 colors = CardDefaults.cardColors(containerColor = Color.White)
                             ) {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .background(Color(0x570986E7)),
+                                        .background(Color(0x57BE09E7)),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     if (representativePhoto != null) {

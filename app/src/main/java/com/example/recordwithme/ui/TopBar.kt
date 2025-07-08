@@ -25,13 +25,13 @@ import com.example.recordwithme.R
 @Composable
 fun TopBar(onMenuClick: () -> Unit) {
     Surface(
-        color = Color(0xFF1A7BCF), // 연갈색 배경
+        color = Color(0xFF1A7BCF), // 배경
         elevation = 0.dp
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(70.dp) // 원하는 높이로 조절
+                .height(70.dp) // 탑바 높이
         ) {
             // 왼쪽: 로고
             Row(

@@ -5,6 +5,7 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -152,7 +153,7 @@ fun GroupScreen(navController: NavController) {
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.White)
-                .padding((screenWidth.value * 0.06f).dp)
+                .padding(horizontal = 14.dp)
         ) {
             item {
                 Spacer(modifier = Modifier.width((screenWidth.value * 0.04f).dp))
@@ -162,7 +163,7 @@ fun GroupScreen(navController: NavController) {
                         fontSize = (screenWidth.value * 0.06f).sp,
                         fontWeight = FontWeight.Bold
                     ),
-                    modifier = Modifier.padding(bottom = (screenHeight.value * 0.02f).dp)
+                    modifier = Modifier.padding(bottom = (screenHeight.value * 0.03f).dp, start = (screenWidth.value * 0.02f).dp, top = (screenHeight.value * 0.04f).dp)
                 )
             }
             if (isLoading.value) {
@@ -455,7 +456,12 @@ fun GroupItem(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = (localScreenWidth.value * 0.02f).dp, vertical = (localScreenHeight.value * 0.005f).dp),
+            .padding(horizontal = 0.dp, vertical = (localScreenHeight.value * 0.008f).dp)
+            .border(
+                width = 1.dp,
+                color = if (isExpanded) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else Color.LightGray,
+                shape = RoundedCornerShape((localScreenWidth.value * 0.02f).dp)
+            ),
         shape = RoundedCornerShape((localScreenWidth.value * 0.02f).dp),
         colors = CardDefaults.cardColors(
             containerColor = if (isExpanded) Color(0xFFF5F5F5) else Color.Transparent
@@ -468,7 +474,12 @@ fun GroupItem(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { onClick() }
-                    .padding(vertical = (localScreenHeight.value * 0.01f).dp, horizontal = (localScreenWidth.value * 0.02f).dp),
+                    .padding(
+                        start = (localScreenWidth.value * 0.03f).dp,
+                        end = (localScreenWidth.value * 0.03f).dp,
+                        top = (localScreenHeight.value * 0.01f).dp,
+                        bottom = (localScreenHeight.value * 0.01f).dp
+                    ),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
@@ -485,12 +496,12 @@ fun GroupItem(
                             fontSize = (localScreenWidth.value * 0.04f).sp,
                             fontWeight = if (isExpanded) FontWeight.Bold else FontWeight.Normal
                         ),
-                        color = if (isExpanded) MaterialTheme.colorScheme.primary else Color.Black
+                        color = if (isExpanded) Color(0xFF1A237E) else Color.Black
                     )
                     Text(
                         text = "${membersCount} members",
                         style = MaterialTheme.typography.bodyMedium.copy(
-                            color = if (isExpanded) MaterialTheme.colorScheme.primary.copy(alpha = 0.7f) else Color.Gray,
+                            color = if (isExpanded) Color(0xFF1A237E) else Color.Gray,
                             fontSize = (localScreenWidth.value * 0.035f).sp
                         )
                     )
@@ -602,23 +613,31 @@ fun GroupDetailPanel(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 // 메모
+                Spacer(modifier = Modifier.height((screenHeight.value * 0f).dp))
                 if (group.note.isNotEmpty()) {
-                    Text(
-                        text = "메모",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontSize = (screenWidth.value * 0.04f).sp,
-                            fontWeight = FontWeight.SemiBold
-                        ),
-                        modifier = Modifier.padding(bottom = (screenHeight.value * 0.03f).dp, start = (screenWidth.value * 0.02f).dp)
-                    )
-                    Text(
-                        text = group.note,
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontSize = (screenWidth.value * 0.035f).sp,
-                            color = Color.Gray
-                        ),
-                        modifier = Modifier.padding(start = (screenWidth.value * 0.02f).dp)
-                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = (screenWidth.value * 0.025f).dp, vertical = (screenHeight.value * 0.015f).dp)
+                            .background(
+                                color = Color(0xFFF5F6FA),
+                                shape = RoundedCornerShape(10.dp)
+                            )
+                            .border(
+                                width = 1.dp,
+                                color = Color(0xFFE0E3EB),
+                                shape = RoundedCornerShape(10.dp)
+                            )
+                    ) {
+                        Text(
+                            text = group.note,
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontSize = (screenWidth.value * 0.035f).sp,
+                                color = Color.Black
+                            ),
+                            modifier = Modifier.padding(12.dp)
+                        )
+                    }
                 }
 
                 // 멤버 정보

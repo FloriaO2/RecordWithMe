@@ -245,9 +245,9 @@ fun SignUpScreen(navController: NavController) {
                                                     "uid" to (user?.uid ?: id),
                                                 )
                                                 
-                                                // 사용자 문서 ID를 id값으로 설정
+                                                // 사용자 문서 ID를 uid값으로 설정
                                                 db.collection("users")
-                                                    .document(id)
+                                                    .document(user?.uid ?: id)
                                                     .set(userInfo)
                                                     .addOnSuccessListener {
                                                         Toast.makeText(context, "회원가입 성공!", Toast.LENGTH_SHORT).show()
@@ -295,9 +295,9 @@ fun SignUpScreen(navController: NavController) {
                                                 "uid" to (user?.uid ?: id),
                                             )
                                             
-                                            // 사용자 문서 ID를 id값으로 설정
+                                            // 사용자 문서 ID를 uid값으로 설정
                                             db.collection("users")
-                                                .document(id)
+                                                .document(user?.uid ?: id)
                                                 .set(userInfo)
                                                 .addOnSuccessListener {
                                                     Toast.makeText(context, "회원가입 성공!", Toast.LENGTH_SHORT).show()

@@ -445,7 +445,7 @@ fun NotificationScreen(
                     val groupName = childSnapshot.child("groupName").getValue(String::class.java)
                     newNotifications.add(
                         Notification(
-                            id = id,
+                            id = "rt_${id}",
                             type = type,
                             fromUserId = fromUserId,
                             fromUserName = fromUserName,
@@ -469,7 +469,7 @@ fun NotificationScreen(
                             val timestamp = doc.getLong("timestamp") ?: return@mapNotNull null
                             
                             Notification(
-                                id = doc.id,
+                                id = "fs_${doc.id}",
                                 type = type,
                                 fromUserId = fromUserId,
                                 fromUserName = fromUserName,

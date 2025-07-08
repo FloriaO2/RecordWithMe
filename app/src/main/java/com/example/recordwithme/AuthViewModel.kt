@@ -41,7 +41,9 @@ class AuthViewModel : ViewModel() {
                                     val userDoc = hashMapOf(
                                         "email" to (user.email ?: ""),
                                         "name" to (user.displayName ?: ""),
-                                        "id" to user.uid
+                                        "id" to (user.email ?: user.uid ?: ""),
+                                        "uid" to (user.email ?: user.uid ?: ""),
+                                        "loginType" to "google"
                                     )
                                     userDocRef.set(userDoc)
                                         .addOnSuccessListener {

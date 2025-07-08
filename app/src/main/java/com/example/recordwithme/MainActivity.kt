@@ -56,7 +56,8 @@ class MainActivity : ComponentActivity() {
         }
 
         // 시스템 UI 설정
-        WindowCompat.setDecorFitsSystemWindows(window, true)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        hideSystemUI()
 
         setContent {
             val navController = rememberNavController()
@@ -224,5 +225,12 @@ class MainActivity : ComponentActivity() {
             Log.w("MainActivity", "Google sign in failed", e)
             viewModel.setUser(null)
         }
+    }
+
+    private fun hideSystemUI() {
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        val controller = WindowInsetsControllerCompat(window, window.decorView)
+        controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        controller.hide(android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.navigationBars())
     }
 }

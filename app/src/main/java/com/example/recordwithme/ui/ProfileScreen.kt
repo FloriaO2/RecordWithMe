@@ -1,9 +1,16 @@
 package com.example.recordwithme.ui
 
+import android.graphics.BitmapFactory
+import android.net.Uri
+import android.util.Base64
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,6 +47,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -52,6 +60,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -63,14 +74,22 @@ import androidx.navigation.NavController
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
 // 데이터 클래스들
-data class Friend(val id: String, val name: String, val mutual: String) {
+data class Friend(
+    val id: String,
+    val name: String,
+    val mutual: String,
+    val profileImageUrl: String? = null,
+    val profileImageIsBase64: Boolean = false
+) {
     val initial: String get() = name.firstOrNull()?.toString() ?: ""
 }
 
-data class User(val id: String, val name: String, val loginType: String, val displayId: String = "")
+data class User(val id: String, val name: String, val loginType: String, val displayId: String = "", val email: String = "")
 
 // 친구 아이템 컴포저블
 @Composable
@@ -119,12 +138,19 @@ fun FriendItem(
                 .background(Color(0xFFBDBDBD)),
             contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = friend.initial,
-                color = Color.White,
-                fontSize = (screenWidth.value * 0.05f).sp,
-                fontWeight = FontWeight.Bold
-            )
+            if (friend.profileImageUrl != null && friend.profileImageIsBase64) {
+                ProfileBase64Image(
+                    base64String = friend.profileImageUrl,
+                    modifier = Modifier.size((screenWidth.value * 0.125f).dp).clip(CircleShape)
+                )
+            } else {
+                Text(
+                    text = friend.initial,
+                    color = Color.White,
+                    fontSize = (screenWidth.value * 0.05f).sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
 
         Spacer(modifier = Modifier.width((screenWidth.value * 0.04f).dp))
@@ -171,16 +197,21 @@ fun FriendSearchDialog(
                     val id = doc.id
                     val userId = doc.getString("id") ?: ""
                     val name = doc.getString("name") ?: ""
+                    val email = doc.getString("email") ?: ""
                     val loginType = if (userId.isNotEmpty()) "normal" else "google"
                     val displayName = name.ifBlank { userId.ifBlank { id } }
                     val displayId = userId
 
+                    // 이메일이 @recordwith.me로 끝나지 않는 경우에만 이메일 검색에 포함
+                    val emailSearchable = !email.endsWith("@recordwith.me") && email.isNotEmpty()
+
                     if ((displayName.contains(searchText, ignoreCase = true) ||
-                                displayId.contains(searchText, ignoreCase = true)) &&
+                                displayId.contains(searchText, ignoreCase = true) ||
+                                (emailSearchable && email.contains(searchText, ignoreCase = true))) &&
                         id != currentUserId &&
                         !currentFriendIds.contains(id)
                     ) {
-                        User(id, displayName, loginType, displayId)
+                        User(id, displayName, loginType, displayId, email)
                     } else null
                 }
             } catch (e: Exception) {
@@ -198,7 +229,7 @@ fun FriendSearchDialog(
                 OutlinedTextField(
                     value = searchText,
                     onValueChange = { searchText = it },
-                    label = { Text("이름 또는 아이디로 검색") },
+                    label = { Text("이름, 아이디 또는 이메일로 검색") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -225,47 +256,99 @@ fun FriendSearchDialog(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text(user.name, fontWeight = FontWeight.Medium)
-                                        if (user.displayId.isNotEmpty()) {
+                                        // @recordwith.me로 끝나지 않는 사용자는 이메일을 표시
+                                        if (!user.email.endsWith("@recordwith.me") && user.email.isNotEmpty()) {
+                                            Text(user.email, fontWeight = FontWeight.Medium)
+                                        } else {
+                                            Text(user.name, fontWeight = FontWeight.Medium)
+                                        }
+                                        // @recordwith.me 사용자는 기존처럼 아이디 표시
+                                        if (user.email.endsWith("@recordwith.me") && user.displayId.isNotEmpty()) {
                                             Text("@${user.displayId}", fontSize = (screenWidth.value * 0.03f).sp, color = Color.Gray)
                                         }
                                     }
                                     Button(
                                         onClick = {
-                                            val requestData = mapOf(
-                                                "fromUserId" to currentUserId,
-                                                "fromUserName" to (currentUserEmail ?: currentUserId),
-                                                "timestamp" to System.currentTimeMillis()
-                                            )
+                                            // 코루틴 스코프에서 비동기 작업 실행
+                                            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                                                try {
+                                                    // 현재 사용자 정보를 Firestore에서 가져오기
+                                                    val currentUserDoc = firestore.collection("users").document(currentUserId).get().await()
+                                                    val currentUserName = currentUserDoc.getString("name") ?: ""
+                                                    val currentUserEmailFromFirestore = currentUserDoc.getString("email") ?: ""
+                                                    
+                                                    // fromUserName 결정: @recordwith.me면 name(있을 때만), 아니면 이메일 전체
+                                                    val isRecordWithMe = currentUserEmailFromFirestore.endsWith("@recordwith.me")
+                                                    val fromUserName = when {
+                                                        isRecordWithMe && currentUserName.isNotEmpty() -> currentUserName
+                                                        currentUserEmailFromFirestore.isNotEmpty() -> currentUserEmailFromFirestore
+                                                        else -> currentUserId
+                                                    }
+                                                    
+                                                    val requestData = mapOf(
+                                                        "fromUserId" to currentUserId,
+                                                        "fromUserName" to fromUserName,
+                                                        "timestamp" to System.currentTimeMillis()
+                                                    )
 
-                                            // Firestore에 친구 신청 저장
-                                            firestore.collection("users")
-                                                .document(user.id)
-                                                .collection("friendRequests")
-                                                .document(currentUserId)
-                                                .set(requestData)
-                                                .addOnSuccessListener {
-                                                    // ✅ Realtime Database에도 저장 (알림용)
-                                                    val realtimeDb = FirebaseDatabase.getInstance().reference
-                                                    realtimeDb.child("notifications")
-                                                        .child(user.id)  // 수신자 ID 경로
-                                                        .push()
-                                                        .setValue(requestData)
+                                                    // Firestore에 친구 신청 저장
+                                                    firestore.collection("users")
+                                                        .document(user.id)
+                                                        .collection("friendRequests")
+                                                        .document(currentUserId)
+                                                        .set(requestData)
+                                                        .addOnSuccessListener {
+                                                            // Firestore notifications에도 저장
+                                                            val notificationData = mapOf(
+                                                                "type" to "friendRequest",
+                                                                "fromUserId" to currentUserId,
+                                                                "fromUserName" to fromUserName,
+                                                                "timestamp" to System.currentTimeMillis()
+                                                            )
+                                                            
+                                                            firestore.collection("users")
+                                                                .document(user.id)
+                                                                .collection("notifications")
+                                                                .add(notificationData)
+                                                                .addOnSuccessListener { doc ->
+                                                                    // ✅ Realtime Database에도 저장 (알림용)
+                                                                    val realtimeDb = FirebaseDatabase.getInstance().reference
+                                                                    val realtimeNotificationData = notificationData.toMutableMap()
+                                                                    realtimeNotificationData["id"] = doc.id
+                                                                    realtimeDb.child("notifications")
+                                                                        .child(user.id)  // 수신자 ID 경로
+                                                                        .child(doc.id)
+                                                                        .setValue(realtimeNotificationData)
+                                                                }
 
-                                                    android.widget.Toast.makeText(
-                                                        context,
-                                                        "친구 요청을 보냈습니다",
-                                                        android.widget.Toast.LENGTH_SHORT
-                                                    ).show()
-                                                    onDismiss()
+                                                            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                                                                android.widget.Toast.makeText(
+                                                                    context,
+                                                                    "친구 요청을 보냈습니다",
+                                                                    android.widget.Toast.LENGTH_SHORT
+                                                                ).show()
+                                                                onDismiss()
+                                                            }
+                                                        }
+                                                        .addOnFailureListener { e ->
+                                                            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                                                                android.widget.Toast.makeText(
+                                                                    context,
+                                                                    "친구 추가에 실패했습니다: ${e.message}",
+                                                                    android.widget.Toast.LENGTH_SHORT
+                                                                ).show()
+                                                            }
+                                                        }
+                                                } catch (e: Exception) {
+                                                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                                        android.widget.Toast.makeText(
+                                                            context,
+                                                            "친구 요청 중 오류가 발생했습니다: ${e.message}",
+                                                            android.widget.Toast.LENGTH_SHORT
+                                                        ).show()
+                                                    }
                                                 }
-                                                .addOnFailureListener { e ->
-                                                    android.widget.Toast.makeText(
-                                                        context,
-                                                        "친구 추가에 실패했습니다: ${e.message}",
-                                                        android.widget.Toast.LENGTH_SHORT
-                                                    ).show()
-                                                }
+                                            }
                                         },
                                         shape = RoundedCornerShape((screenWidth.value * 0.03f).dp),
                                         contentPadding = PaddingValues(
@@ -304,6 +387,34 @@ fun getDisplayEmail(email: String?): String {
     }
 }
 
+// 프로필 Base64 이미지 컴포저블
+@Composable
+fun ProfileBase64Image(base64String: String, modifier: Modifier = Modifier) {
+    var bitmap by remember(base64String) { mutableStateOf<android.graphics.Bitmap?>(null) }
+
+    LaunchedEffect(base64String) {
+        try {
+            val bytes = Base64.decode(base64String, Base64.DEFAULT)
+            bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        } catch (e: Exception) {
+            // Base64 디코딩 실패 시 처리
+        }
+    }
+
+    if (bitmap != null) {
+        Image(
+            bitmap = bitmap!!.asImageBitmap(),
+            contentDescription = "프로필 이미지",
+            modifier = modifier,
+            contentScale = ContentScale.Crop
+        )
+    } else {
+        Box(modifier = modifier.background(Color.LightGray), contentAlignment = Alignment.Center) {
+            Text("이미지 로딩 중...", color = Color.White)
+        }
+    }
+}
+
 // 최종 ProfileScreen 컴포저블
 @Composable
 fun ProfileScreen(
@@ -326,6 +437,10 @@ fun ProfileScreen(
     var groupName by remember { mutableStateOf("") }
     var groupNote by remember { mutableStateOf("") }
     var friendsLoaded by remember { mutableStateOf(false) }
+    
+    // 프로필 이미지 관련 상태
+    var profileImageUrl by remember { mutableStateOf<String?>(null) }
+    var profileImageIsBase64 by remember { mutableStateOf(false) }
     
     // View Details 상태 관리
     var showDetails by remember { mutableStateOf(false) }
@@ -406,7 +521,7 @@ fun ProfileScreen(
         label = "detailsOffset"
     )
 
-    // 사용자 정보 및 친구 목록 불러오기
+    // 사용자 정보 불러오기
     LaunchedEffect(currentUserId) {
         try {
             // 사용자 정보 불러오기
@@ -418,33 +533,109 @@ fun ProfileScreen(
             if (userDoc.exists()) {
                 userName = userDoc.getString("name") ?: ""
                 userDisplayId = userDoc.getString("id") ?: ""
+                profileImageUrl = userDoc.getString("profileImageUrl")
+                profileImageIsBase64 = userDoc.getBoolean("profileImageIsBase64") ?: false
             }
-
-            val snapshot = firestore.collection("users")
-                .document(currentUserId)
-                .collection("friends")
-                .get()
-                .await()
-            friends = snapshot.documents.mapNotNull { doc ->
-                val id = doc.id
-                
-                // 친구의 사용자 문서에서 정보 가져오기
-                val friendUserDoc = firestore.collection("users").document(id).get().await()
-                val name = friendUserDoc.getString("name") ?: ""
-                val email = friendUserDoc.getString("email") ?: ""
-                
-                // 1순위: name이 설정되어 있고 비어있지 않은 경우 name 사용
-                // 2순위: name이 없거나 비어있는 경우 이메일 사용
-                val displayName = if (name.isNotBlank()) {
-                    name
-                } else {
-                    email
-                }
-                
-                Friend(id, displayName, "친구")
-            }
-            friendsLoaded = true
         } catch (_: Exception) {}
+    }
+    
+    // 친구 목록 리스너 정리
+    DisposableEffect(currentUserId) {
+        val friendsRef = firestore.collection("users")
+            .document(currentUserId)
+            .collection("friends")
+        
+        val friendListeners = mutableMapOf<String, ListenerRegistration>()
+        val friendsList = mutableListOf<Friend>()
+        
+        val mainListener = friendsRef.addSnapshotListener { snapshot, _ ->
+            if (snapshot != null) {
+                friendsList.clear()
+                // 기존 리스너 해제
+                friendListeners.values.forEach { it.remove() }
+                friendListeners.clear()
+                
+                snapshot.documents.forEach { doc ->
+                    val id = doc.id
+                    // 각 친구의 사용자 문서에 실시간 리스너 등록
+                    val listener = firestore.collection("users").document(id)
+                        .addSnapshotListener { friendUserDoc, _ ->
+                            if (friendUserDoc != null && friendUserDoc.exists()) {
+                                val name = friendUserDoc.getString("name") ?: ""
+                                val email = friendUserDoc.getString("email") ?: ""
+                                val profileImageUrl = friendUserDoc.getString("profileImageUrl")
+                                val profileImageIsBase64 = friendUserDoc.getBoolean("profileImageIsBase64") ?: false
+                                val displayName = if (name.isNotBlank()) name else email
+                                val friend = Friend(
+                                    id = id,
+                                    name = displayName,
+                                    mutual = "친구",
+                                    profileImageUrl = profileImageUrl,
+                                    profileImageIsBase64 = profileImageIsBase64
+                                )
+                                // 중복 방지
+                                friendsList.removeAll { it.id == id }
+                                friendsList.add(friend)
+                                // 모든 친구 정보가 모이면 friends 상태 업데이트
+                                if (friendsList.size == snapshot.documents.size) {
+                                    friends = friendsList.toList()
+                                    friendsLoaded = true
+                                }
+                            }
+                        }
+                    friendListeners[id] = listener
+                }
+                // 친구가 없는 경우
+                if (snapshot.documents.isEmpty()) {
+                    friends = emptyList()
+                    friendsLoaded = true
+                }
+            }
+        }
+        
+        onDispose {
+            mainListener.remove()
+            friendListeners.values.forEach { it.remove() }
+        }
+    }
+
+    var showWithdrawDialog by remember { mutableStateOf(false) }
+    var isProcessing by remember { mutableStateOf(false) }
+    
+    // 갤러리 런처
+    val profileImageLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let { imageUri ->
+            // 프로필 이미지를 Base64로 변환하여 Firestore에 저장
+            try {
+                val inputStream = context.contentResolver.openInputStream(imageUri)
+                if (inputStream != null) {
+                    val bytes = inputStream.readBytes()
+                    val base64String = Base64.encodeToString(bytes, Base64.DEFAULT)
+                    
+                    // Firestore에 프로필 이미지 저장
+                    firestore.collection("users")
+                        .document(currentUserId)
+                        .update(
+                            mapOf(
+                                "profileImageUrl" to base64String,
+                                "profileImageIsBase64" to true
+                            )
+                        )
+                        .addOnSuccessListener {
+                            profileImageUrl = base64String
+                            profileImageIsBase64 = true
+                            android.widget.Toast.makeText(context, "프로필 이미지가 변경되었습니다", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                        .addOnFailureListener { e ->
+                            android.widget.Toast.makeText(context, "프로필 이미지 변경 실패: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                }
+            } catch (e: Exception) {
+                android.widget.Toast.makeText(context, "이미지 처리 실패: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     // 전체 화면 Box로 감싸서 버튼을 고정 위치에 띄우기
@@ -499,22 +690,50 @@ fun ProfileScreen(
                                 modifier = Modifier
                                     .size(profileImageSize)
                                     .clip(CircleShape)
-                                    .background(Color(0xFFE0E0E0)),
+                                    .background(Color(0xFFE0E0E0))
+                                    .pointerInput(Unit) {
+                                        detectTapGestures(
+                                            onLongPress = {
+                                                profileImageLauncher.launch("image/*")
+                                            }
+                                        )
+                                    },
                                 contentAlignment = Alignment.Center
                             ) {
-                                val displayText = when {
-                                    userName.isNotEmpty() -> userName.first().uppercaseChar().toString()
-                                    userDisplayId.isNotEmpty() -> userDisplayId.first().uppercaseChar().toString()
-                                    currentUserEmail?.isNotEmpty() == true -> currentUserEmail.first().uppercaseChar().toString()
-                                    else -> "U"
-                                }
+                                if (profileImageUrl != null) {
+                                    // 프로필 이미지가 있으면 이미지 표시
+                                    if (profileImageIsBase64) {
+                                        ProfileBase64Image(
+                                            base64String = profileImageUrl!!,
+                                            modifier = Modifier
+                                                .size(profileImageSize)
+                                                .clip(CircleShape)
+                                        )
+                                    } else {
+                                        // URL 이미지인 경우 (현재는 Base64만 사용)
+                                        Text(
+                                            text = "이미지 오류",
+                                            fontSize = (profileImageSize.value * 0.2).sp,
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                } else {
+                                    // 프로필 이미지가 없으면 이니셜 표시
+                                    val displayText = when {
+                                        userName.isNotEmpty() -> userName.first().uppercaseChar().toString()
+                                        userDisplayId.isNotEmpty() -> userDisplayId.first().uppercaseChar().toString()
+                                        currentUserEmail?.isNotEmpty() == true -> currentUserEmail.first().uppercaseChar().toString()
+                                        else -> "U"
+                                    }
 
-                                Text(
-                                    text = displayText,
-                                    fontSize = (profileImageSize.value * 0.35).sp,
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold
-                                )
+                                    Text(
+                                        text = displayText,
+                                        fontSize = (profileImageSize.value * 0.35).sp,
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                             }
                         }
 
@@ -574,6 +793,25 @@ fun ProfileScreen(
                                         DetailItem("이메일", displayEmail, valueTextAlign = TextAlign.End)
                                     }
                                     DetailItem("친구 수", "${friends.size}명")
+                                    // 회원 탈퇴 텍스트 버튼 (RecordWithMe 계정용)
+                                    TextButton(
+                                        onClick = { showWithdrawDialog = true },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .offset(
+                                                y = -(screenHeight.value * 0.015f).dp,
+                                                x = (screenWidth.value * 0.03f).dp
+                                            )
+                                    ) {
+                                        Text(
+                                            "회원 탈퇴",
+                                            color = Color(0xFF8B0000),
+                                            fontSize = (screenWidth.value * 0.03f).sp,
+                                            fontWeight = FontWeight.Medium,
+                                            modifier = Modifier.fillMaxWidth(),
+                                            textAlign = TextAlign.End
+                                        )
+                                    }
                                 } else {
                                     // 일반 로그인: 조건 분기
                                     if (currentUserEmail?.endsWith("@recordwith.me") == true) {
@@ -592,28 +830,24 @@ fun ProfileScreen(
                                         }
                                     }
                                     DetailItem("친구 수", "${friends.size}명")
-                                }
-                                
-                                // 회원 탈퇴 버튼
-                                TextButton(
-                                    onClick = {
-                                        // 회원 탈퇴 로직 구현
-                                    },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .offset(
-                                            y = -(screenHeight.value * 0.015f).dp, 
-                                            x = (screenWidth.value * 0.03f).dp
+                                    TextButton(
+                                        onClick = { showWithdrawDialog = true },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .offset(
+                                                y = -(screenHeight.value * 0.015f).dp,
+                                                x = (screenWidth.value * 0.03f).dp
+                                            )
+                                    ) {
+                                        Text(
+                                            "회원 탈퇴",
+                                            color = Color(0xFF8B0000),
+                                            fontSize = (screenWidth.value * 0.03f).sp,
+                                            fontWeight = FontWeight.Medium,
+                                            modifier = Modifier.fillMaxWidth(),
+                                            textAlign = TextAlign.End
                                         )
-                                ) {
-                                    Text(
-                                        "회원 탈퇴",
-                                        color = Color(0xFF8B0000), // 검붉은 색
-                                        fontSize = (screenWidth.value * 0.03f).sp,
-                                        fontWeight = FontWeight.Medium,
-                                        modifier = Modifier.fillMaxWidth(),
-                                        textAlign = TextAlign.End
-                                    )
+                                    }
                                 }
                             }
                         }
@@ -777,10 +1011,10 @@ fun ProfileScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
-                    contentPadding = PaddingValues(horizontal = horizontalPadding * 1.5f, vertical = (screenHeight.value * 0.005f).dp),
+                    contentPadding = PaddingValues(horizontal = horizontalPadding * 0.7f, vertical = (screenHeight.value * 0.005f).dp),
                     verticalArrangement = Arrangement.spacedBy((screenHeight.value * 0.015f).dp)
                 ) {
-                    items(friends) { friend ->
+                    items(friends.sortedBy { it.name }) { friend ->
                         val isSelected = friend.id in selectedFriendIds
 
                         Row(
@@ -812,6 +1046,9 @@ fun ProfileScreen(
                                 onRemoveClick = { toRemove ->
                                     firestore.collection("users").document(currentUserId)
                                         .collection("friends").document(toRemove.id).delete()
+                                    // 쌍방 삭제: 상대방 friends에서도 나를 삭제
+                                    firestore.collection("users").document(toRemove.id)
+                                        .collection("friends").document(currentUserId).delete()
                                     friends = friends.filter { it.id != toRemove.id }
                                     selectedFriendIds.remove(toRemove.id)
                                 }
@@ -871,97 +1108,132 @@ fun ProfileScreen(
                     }
                 },
                 confirmButton = {
-                    TextButton(onClick = {
-                        if (groupName.isBlank()) return@TextButton
-                        
-                        // 그룹 생성 (생성자만 멤버로 추가)
-                        val groupId = groupName.trim()
-                        val groupData = mapOf(
-                            "name" to groupName,
-                            "note" to groupNote,
-                            "members" to listOf(currentUserId),  // 생성자만 초기 멤버
-                            "creator" to currentUserId,
-                            "createdAt" to com.google.firebase.Timestamp.now()
-                        )
-                        
-                        firestore.collection("groups").document(groupId).set(groupData).addOnSuccessListener {
-                            // 생성자를 그룹 멤버로 추가
-                            val memberGroupData = groupData + ("groupId" to groupId)
-                            firestore.collection("users").document(currentUserId).collection("groups").document(groupId).set(memberGroupData)
-                            
-                            // 선택된 친구들에게 그룹 초대 보내기
-                            println("ProfileScreen: Sending group invites to ${selectedFriendIds.size} friends")
-                            selectedFriendIds.forEach { friendId ->
-                                println("ProfileScreen: Sending invite to friendId: $friendId")
-                                
-                                val inviteData = mapOf(
-                                    "groupId" to groupId,
-                                    "groupName" to groupName,
-                                    "groupNote" to groupNote,
-                                    "inviterId" to currentUserId,
-                                    "inviterName" to (userName.ifBlank { currentUserEmail ?: "Unknown" }),
-                                    "invitedAt" to com.google.firebase.Timestamp.now(),
-                                    "status" to "pending"  // pending, accepted, declined
-                                )
-                                
-                                // Firestore에 초대 저장
-                                firestore.collection("users")
-                                    .document(friendId)
-                                    .collection("groupInvites")
-                                    .document(groupId)
-                                    .set(inviteData)
-                                    .addOnSuccessListener {
-                                        println("ProfileScreen: Group invite saved to Firestore for friendId: $friendId")
+                    Button(
+                        onClick = {
+                            // 코루틴 스코프에서 비동기 작업 실행
+                            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                                try {
+                                    // 그룹 생성 로직
+                                    val trimmedGroupName = groupName.trim()
+                                    val trimmedGroupNote = groupNote.trim()
+                                    val groupCreator = currentUserId
+                                    val groupId = trimmedGroupName // 그룹 이름을 ID로 사용
+
+                                    // 1. Firestore groups 컬렉션에 그룹 생성
+                                    val groupData = mapOf(
+                                        "name" to trimmedGroupName,
+                                        "note" to trimmedGroupNote,
+                                        "creator" to groupCreator,
+                                        "members" to listOf(currentUserId), // 생성자만 초기 멤버
+                                        "createdAt" to com.google.firebase.Timestamp.now()
+                                    )
+
+                                    firestore.collection("groups").document(groupId).set(groupData).await()
+
+                                    // 2. 생성자를 그룹 멤버로 추가 (users/{uid}/groups)
+                                    val memberGroupData = groupData + ("groupId" to groupId)
+                                    firestore.collection("users")
+                                        .document(currentUserId)
+                                        .collection("groups")
+                                        .document(groupId)
+                                        .set(memberGroupData)
+                                    
+                                    // 3. 현재 사용자 정보를 Firestore에서 가져오기
+                                    if (currentUserId == null) {
+                                        println("ProfileScreen: currentUserId is null")
+                                        return@launch
                                     }
-                                    .addOnFailureListener { e ->
-                                        println("ProfileScreen: Failed to save group invite to Firestore for friendId: $friendId, error: ${e.message}")
+                                    val currentUserDoc = firestore.collection("users").document(currentUserId).get().await()
+                                    val currentUserName = currentUserDoc.getString("name") ?: ""
+                                    val currentUserEmail = currentUserDoc.getString("email") ?: ""
+                                    
+                                    // fromUserName: name > email > uid 순서로 표시
+                                    val fromUserName = when {
+                                        currentUserName.isNotEmpty() -> currentUserName
+                                        currentUserEmail.isNotEmpty() -> currentUserEmail
+                                        else -> currentUserId
                                     }
-                                
-                                // Realtime Database에 알림 저장
-                                val realtimeDb = com.google.firebase.database.FirebaseDatabase.getInstance().reference
-                                val notificationData = mapOf(
-                                    "type" to "groupInvite",
-                                    "groupId" to groupId,
-                                    "groupName" to groupName,
-                                    "fromUserId" to currentUserId,
-                                    "fromUserName" to (userName.ifBlank { currentUserEmail ?: "Unknown" }),
-                                    "timestamp" to com.google.firebase.database.ServerValue.TIMESTAMP
-                                )
-                                
-                                realtimeDb.child("notifications")
-                                    .child(friendId)
-                                    .push()
-                                    .setValue(notificationData)
-                                    .addOnSuccessListener {
-                                        println("ProfileScreen: Group invite notification saved to Realtime DB for friendId: $friendId")
+                                    
+                                    println("ProfileScreen: fromUserName determined: $fromUserName")
+                                    
+                                    // 4. 선택된 친구들에게 그룹 초대 보내기
+                                    selectedFriendIds.forEach { friendId ->
+                                        println("ProfileScreen: Sending group invite to $friendId for group $groupId")
+                                        
+                                        // Firestore groupInvites
+                                        val inviteData = mapOf(
+                                            "groupId" to groupId,
+                                            "groupName" to trimmedGroupName,
+                                            "groupNote" to trimmedGroupNote,
+                                            "inviterId" to currentUserId,
+                                            "inviterName" to fromUserName,
+                                            "invitedAt" to com.google.firebase.Timestamp.now(),
+                                            "status" to "pending"
+                                        )
+                                        
+                                        firestore.collection("users")
+                                            .document(friendId)
+                                            .collection("groupInvites")
+                                            .document(groupId)
+                                            .set(inviteData)
+                                        
+                                        // 알림 전송 (Firestore)
+                                        val inviteNotification = mapOf(
+                                            "type" to "groupInvite",
+                                            "fromUserId" to currentUserId,
+                                            "fromUserName" to fromUserName,
+                                            "groupId" to groupId,
+                                            "groupName" to trimmedGroupName,
+                                            "timestamp" to System.currentTimeMillis()
+                                        )
+                                        
+                                        firestore.collection("users")
+                                            .document(friendId)
+                                            .collection("notifications")
+                                            .add(inviteNotification)
+                                        
+                                        // 알림 전송 (Realtime DB)
+                                        val ref = FirebaseDatabase.getInstance().reference
+                                            .child("notifications")
+                                            .child(friendId)
+                                            .push()
+                                        val notificationId = ref.key ?: ""
+                                        val inviteNotificationWithId = inviteNotification.toMutableMap()
+                                        inviteNotificationWithId["id"] = notificationId
+                                        ref.setValue(inviteNotificationWithId)
                                     }
-                                    .addOnFailureListener { e ->
-                                        println("ProfileScreen: Failed to save group invite notification to Realtime DB for friendId: $friendId, error: ${e.message}")
+
+                                    // UI 업데이트는 메인 스레드에서
+                                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                        groupName = ""
+                                        groupNote = ""
+                                        selectedFriendIds.clear()
+                                        GroupModeState.isGroupMode = false
+                                        showGroupDialog = false
+
+                                        android.widget.Toast.makeText(
+                                            context,
+                                            "그룹이 생성되었습니다.\n친구들에게 초대를 보냈습니다.",
+                                            android.widget.Toast.LENGTH_SHORT
+                                        ).show()
+
+                                        navController.popBackStack() // 그룹 생성 후 GroupScreen으로 돌아가기
                                     }
+                                } catch (e: Exception) {
+                                    // 에러 처리
+                                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                        android.widget.Toast.makeText(
+                                            context,
+                                            "그룹 생성 중 오류가 발생했습니다: ${e.message}",
+                                            android.widget.Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                }
                             }
-                            
-                            groupName = ""
-                            groupNote = ""
-                            selectedFriendIds.clear()
-                            GroupModeState.isGroupMode = false
-                            showGroupDialog = false
-                            
-                            android.widget.Toast.makeText(
-                                context,
-                                "그룹이 생성되었습니다.\n친구들에게 초대를 보냈습니다.",
-                                android.widget.Toast.LENGTH_SHORT
-                            ).show()
-                            
-                            navController.popBackStack() // 그룹 생성 후 GroupScreen으로 돌아가기
-                        }.addOnFailureListener { e ->
-                            android.widget.Toast.makeText(
-                                context,
-                                "그룹 생성에 실패했습니다: ${e.message}",
-                                android.widget.Toast.LENGTH_SHORT
-                            ).show()
-                        }
-                    }) {
-                        Text("그룹 생성 및 초대 보내기")
+                        },
+                        enabled = groupName.isNotBlank() && selectedFriendIds.isNotEmpty()
+                    ) {
+                        Text("그룹 초대하기")
                     }
                 },
                 dismissButton = {
@@ -975,42 +1247,249 @@ fun ProfileScreen(
                 }
             )
         }
+    }
 
-        // 친구 추가 검색 다이얼로그
-        if (showFriendDialog) {
-            FriendSearchDialog(
-                currentUserId = currentUserId,
-                currentUserEmail = currentUserEmail,
-                firestore = firestore,
-                onDismiss = { showFriendDialog = false },
-                onFriendAdded = { newFriend -> friends = friends + newFriend },
-                currentFriendIds = friends.map { it.id }
-            )
-        }
+    // 친구 추가 검색 다이얼로그
+    if (showFriendDialog) {
+        FriendSearchDialog(
+            currentUserId = currentUserId,
+            currentUserEmail = currentUserEmail,
+            firestore = firestore,
+            onDismiss = { showFriendDialog = false },
+            onFriendAdded = { newFriend -> friends = friends + newFriend },
+            currentFriendIds = friends.map { it.id }
+        )
+    }
 
-        // 친구가 없을 때 안내 다이얼로그
-        if (showNoFriendsDialog) {
-            AlertDialog(
-                onDismissRequest = { showNoFriendsDialog = false },
-                title = { Text("친구가 필요합니다") },
-                text = { Text("그룹을 만들기 위해서는 먼저 친구를 추가해주세요.") },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            showNoFriendsDialog = false
-                            showFriendDialog = true
-                        }
-                    ) {
-                        Text("친구 추가하기")
+    // 친구가 없을 때 안내 다이얼로그
+    if (showNoFriendsDialog) {
+        AlertDialog(
+            onDismissRequest = { showNoFriendsDialog = false },
+            title = { Text("친구가 필요합니다") },
+            text = { Text("그룹을 만들기 위해서는 먼저 친구를 추가해주세요.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showNoFriendsDialog = false
+                        showFriendDialog = true
                     }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showNoFriendsDialog = false }) {
-                        Text("취소")
-                    }
+                ) {
+                    Text("친구 추가하기")
                 }
-            )
-        }
+            },
+            dismissButton = {
+                TextButton(onClick = { showNoFriendsDialog = false }) {
+                    Text("취소")
+                }
+            }
+        )
+    }
+
+    // 회원 탈퇴 확인 다이얼로그
+    if (showWithdrawDialog) {
+        AlertDialog(
+            onDismissRequest = { showWithdrawDialog = false },
+            title = { Text("정말로 탈퇴하시겠습니까?") },
+            text = { Text("탈퇴 시 복구할 수 없습니다.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showWithdrawDialog = false
+                        isProcessing = true
+                        // 탈퇴 처리 함수 호출
+                        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                            try {
+                                // 0. Firebase Auth에서 사용자 계정 삭제
+                                val currentUser = auth.currentUser
+                                if (currentUser != null) {
+                                    currentUser.delete().await()
+                                }
+                                
+                                // 1. 모든 groups/*/members에서 해당 uid를 삭제 (메인 문서 삭제 전에)
+                                val groupsSnapshot = firestore.collection("groups").get().await()
+                                groupsSnapshot.documents.forEach { groupDoc ->
+                                    val members = groupDoc.get("members") as? List<String> ?: emptyList()
+                                    if (members.contains(currentUserId)) {
+                                        val updatedMembers = members.filter { it != currentUserId }
+                                        
+                                        if (updatedMembers.isEmpty()) {
+                                            // 멤버가 없으면 그룹 완전 삭제
+                                            firestore.collection("groups")
+                                                .document(groupDoc.id)
+                                                .delete()
+                                                .await()
+                                            
+                                            // 그룹 캘린더의 사진들 삭제
+                                            val photosSnapshot = firestore.collection("groups")
+                                                .document(groupDoc.id)
+                                                .collection("photos")
+                                                .get()
+                                                .await()
+                                            
+                                            photosSnapshot.documents.forEach { photoDoc ->
+                                                firestore.collection("groups")
+                                                    .document(groupDoc.id)
+                                                    .collection("photos")
+                                                    .document(photoDoc.id)
+                                                    .delete()
+                                                    .await()
+                                            }
+                                            
+                                            // 모든 사용자의 개인 그룹 목록에서도 해당 그룹 삭제
+                                            val allUsersSnapshot = firestore.collection("users").get().await()
+                                            allUsersSnapshot.documents.forEach { userDoc ->
+                                                firestore.collection("users")
+                                                    .document(userDoc.id)
+                                                    .collection("groups")
+                                                    .document(groupDoc.id)
+                                                    .delete()
+                                            }
+                                        } else {
+                                            // 멤버가 있으면 멤버 목록만 업데이트
+                                            firestore.collection("groups")
+                                                .document(groupDoc.id)
+                                                .update("members", updatedMembers)
+                                                .await()
+                                        }
+                                    }
+                                }
+                                
+                                // 2. 모든 users/*/groups/{groupId}에서 탈퇴한 사용자 삭제 (메인 문서 삭제 전에)
+                                val allUsersSnapshot = firestore.collection("users").get().await()
+                                allUsersSnapshot.documents.forEach { userDoc ->
+                                    val userGroupsSnapshot = firestore.collection("users")
+                                        .document(userDoc.id)
+                                        .collection("groups")
+                                        .get()
+                                        .await()
+                                    
+                                    userGroupsSnapshot.documents.forEach { groupDoc ->
+                                        val groupMembers = groupDoc.get("members") as? List<String> ?: emptyList()
+                                        if (groupMembers.contains(currentUserId)) {
+                                            val updatedGroupMembers = groupMembers.filter { it != currentUserId }
+                                            firestore.collection("users")
+                                                .document(userDoc.id)
+                                                .collection("groups")
+                                                .document(groupDoc.id)
+                                                .update("members", updatedGroupMembers)
+                                                .await()
+                                        }
+                                    }
+                                }
+                                
+                                // 3. 탈퇴한 사용자의 groups 컬렉션 삭제
+                                val currentUserGroupsSnapshot = firestore.collection("users")
+                                    .document(currentUserId)
+                                    .collection("groups")
+                                    .get()
+                                    .await()
+                                
+                                currentUserGroupsSnapshot.documents.forEach { groupDoc ->
+                                    firestore.collection("users")
+                                        .document(currentUserId)
+                                        .collection("groups")
+                                        .document(groupDoc.id)
+                                        .delete()
+                                        .await()
+                                }
+                                
+                                // 4. 탈퇴한 사용자의 친구 목록 삭제
+                                val currentUserFriendsSnapshot = firestore.collection("users")
+                                    .document(currentUserId)
+                                    .collection("friends")
+                                    .get()
+                                    .await()
+                                
+                                currentUserFriendsSnapshot.documents.forEach { friendDoc ->
+                                    firestore.collection("users")
+                                        .document(currentUserId)
+                                        .collection("friends")
+                                        .document(friendDoc.id)
+                                        .delete()
+                                        .await()
+                                }
+
+                                // 5. 탈퇴한 사용자의 알림 삭제
+                                val currentUserNotificationsSnapshot = firestore.collection("users")
+                                    .document(currentUserId)
+                                    .collection("notifications")
+                                    .get()
+                                    .await()
+                                
+                                currentUserNotificationsSnapshot.documents.forEach { notificationDoc ->
+                                    firestore.collection("users")
+                                        .document(currentUserId)
+                                        .collection("notifications")
+                                        .document(notificationDoc.id)
+                                        .delete()
+                                        .await()
+                                }
+                                
+                                // 6. 탈퇴한 사용자의 그룹 초대 삭제
+                                val currentUserGroupInvitesSnapshot = firestore.collection("users")
+                                    .document(currentUserId)
+                                    .collection("groupInvites")
+                                    .get()
+                                    .await()
+                                
+                                currentUserGroupInvitesSnapshot.documents.forEach { inviteDoc ->
+                                    firestore.collection("users")
+                                        .document(currentUserId)
+                                        .collection("groupInvites")
+                                        .document(inviteDoc.id)
+                                        .delete()
+                                        .await()
+                                }
+                                
+                                // 7. users/{uid} 메인 문서 삭제 (모든 참조 제거 후)
+                                firestore.collection("users").document(currentUserId).delete().await()
+
+                                // 8. 모든 users/*/friends/{탈퇴유저} 삭제
+                                val usersSnapshot = firestore.collection("users").get().await()
+                                usersSnapshot.documents.forEach { userDoc ->
+                                    firestore.collection("users")
+                                        .document(userDoc.id)
+                                        .collection("friends")
+                                        .document(currentUserId)
+                                        .delete()
+                                        .await()
+                                }
+
+                                // 9. Realtime Database의 알림 삭제
+                                FirebaseDatabase.getInstance().reference
+                                    .child("notifications")
+                                    .child(currentUserId)
+                                    .removeValue()
+                                    .await()
+
+                                // 로그아웃 및 홈 이동
+                                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                    auth.signOut()
+                                    android.widget.Toast.makeText(context, "회원 탈퇴가 완료되었습니다.", android.widget.Toast.LENGTH_LONG).show()
+                                    navController.navigate("login") {
+                                        popUpTo(0) { inclusive = true }
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                    android.widget.Toast.makeText(context, "탈퇴 처리 중 오류: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+                                }
+                            } finally {
+                                isProcessing = false
+                            }
+                        }
+                    },
+                    enabled = !isProcessing
+                ) {
+                    Text("확인", color = Color.Red)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showWithdrawDialog = false }) {
+                    Text("취소")
+                }
+            }
+        )
     }
 }
 

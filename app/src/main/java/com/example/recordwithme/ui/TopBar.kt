@@ -1,8 +1,15 @@
 package com.example.recordwithme.ui
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.*
-import androidx.compose.material.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.Icon
+import androidx.compose.material.IconButton
+import androidx.compose.material.Surface
+import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.runtime.Composable
@@ -18,7 +25,7 @@ import com.example.recordwithme.R
 @Composable
 fun TopBar(onMenuClick: () -> Unit) {
     Surface(
-        color = Color(0xFFFFF3E0), // 연갈색 배경
+        color = Color(0xFF0986E7), // 연갈색 배경
         elevation = 0.dp
     ) {
         Box(
@@ -36,7 +43,7 @@ fun TopBar(onMenuClick: () -> Unit) {
                 Image(
                     painter = painterResource(id = R.drawable.logo),
                     contentDescription = "앱 로고",
-                    modifier = Modifier.height(35.dp)
+                    modifier = Modifier.height(50.dp)
                 )
             }
 

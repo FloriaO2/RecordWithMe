@@ -28,6 +28,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -46,6 +50,8 @@ fun LoginScreen(
     var password by remember { mutableStateOf("") }
     val context = LocalContext.current
     val auth = FirebaseAuth.getInstance()
+    
+    val passwordFocusRequester = remember { FocusRequester() }
 
     Box(
         modifier = Modifier.fillMaxSize()
@@ -79,7 +85,16 @@ fun LoginScreen(
                 onValueChange = { id = it },
                 label = { Text("아이디") },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp)
+                shape = RoundedCornerShape(20.dp),
+                singleLine = true,
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                    imeAction = ImeAction.Next
+                ),
+                keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                    onNext = {
+                        passwordFocusRequester.requestFocus()
+                    }
+                )
             )
             Spacer(modifier = Modifier.height(8.dp))
             OutlinedTextField(
@@ -87,8 +102,42 @@ fun LoginScreen(
                 onValueChange = { password = it },
                 label = { Text("비밀번호") },
                 visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(passwordFocusRequester),
+                shape = RoundedCornerShape(20.dp),
+                singleLine = true,
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                    imeAction = ImeAction.Done
+                ),
+                keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                    onDone = {
+                        // 로그인 버튼 클릭과 동일한 로직 실행
+                        if (id.isBlank() || password.isBlank()) {
+                            Toast.makeText(context, "아이디와 비밀번호를 모두 입력하세요.", Toast.LENGTH_SHORT).show()
+                            return@KeyboardActions
+                        }
+                        
+                        // 아이디를 페이크 이메일로 변환
+                        val fakeEmail = "$id@recordwith.me"
+                        
+                        // Firebase Authentication을 사용한 로그인
+                        auth.signInWithEmailAndPassword(fakeEmail, password)
+                            .addOnCompleteListener { task ->
+                                if (task.isSuccessful) {
+                                    Toast.makeText(context, "로그인 성공!", Toast.LENGTH_SHORT).show()
+                                    onLoginSuccess()
+                                } else {
+                                    val errorMessage = when (task.exception) {
+                                        is com.google.firebase.auth.FirebaseAuthInvalidUserException -> "존재하지 않는 아이디입니다."
+                                        is com.google.firebase.auth.FirebaseAuthInvalidCredentialsException -> "비밀번호가 일치하지 않습니다."
+                                        else -> "로그인 실패: ${task.exception?.message}"
+                                    }
+                                    Toast.makeText(context, errorMessage, Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                    }
+                )
             )
             Spacer(modifier = Modifier.height(24.dp))
             Button(

@@ -60,6 +60,7 @@ import androidx.navigation.NavController
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
 // 데이터 모델
@@ -80,8 +81,17 @@ fun GroupScreen(navController: NavController) {
     val isLoading = remember { mutableStateOf(true) }
     val friends = remember { mutableStateListOf<String>() }
 
+    // 현재 사용자 ID 가져오기
+    val auth = FirebaseAuth.getInstance()
+    val currentUserId = auth.currentUser?.uid
+
     // 아코디언 패널 상태
     var selectedGroupId by remember { mutableStateOf<String?>(null) }
+    
+    // 다이얼로그 상태
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var showLeaveDialog by remember { mutableStateOf(false) }
+    var groupToLeave by remember { mutableStateOf<UserGroup?>(null) }
 
     // 화면 크기에 따른 반응형 설정
     val configuration = LocalConfiguration.current
@@ -91,9 +101,11 @@ fun GroupScreen(navController: NavController) {
     // Firestore에서 데이터 가져오기
     LaunchedEffect(true) {
         try {
-            // 현재 사용자 ID 가져오기
-            val auth = FirebaseAuth.getInstance()
-            val currentUserId = auth.currentUser?.uid ?: return@LaunchedEffect
+            // 현재 사용자 ID 확인
+            if (currentUserId == null) {
+                println("GroupScreen: currentUserId is null in LaunchedEffect")
+                return@LaunchedEffect
+            }
             
             // 친구 목록 가져오기
             val friendsSnapshot = firestore.collection("users")
@@ -217,51 +229,89 @@ fun GroupScreen(navController: NavController) {
                                 val groupDocRef = FirebaseFirestore.getInstance().collection("groups").document(groupToDelete.id)
                                 groupDocRef.get().addOnSuccessListener { doc ->
                                     val members = doc.get("members") as? List<String> ?: groupToDelete.members
-                                    for (memberId in members) {
-                                        FirebaseFirestore.getInstance().collection("users")
-                                            .document(memberId)
-                                            .collection("groups")
-                                            .document(groupToDelete.id)
-                                            .delete()
-                                            .addOnSuccessListener {
-                                                android.util.Log.i("GroupDelete", "Deleted for user $memberId")
-                                                android.widget.Toast.makeText(
-                                                    context,
-                                                    "${groupToDelete.name} 그룹 삭제 완료",
-                                                    android.widget.Toast.LENGTH_SHORT
-                                                ).show()
+                                    
+                                    // 먼저 그룹 캘린더의 모든 이미지 삭제
+                                    FirebaseFirestore.getInstance().collection("groups")
+                                        .document(groupToDelete.id)
+                                        .collection("photos")
+                                        .get()
+                                        .addOnSuccessListener { photosSnapshot ->
+                                            val deletePhotoTasks = photosSnapshot.documents.map { photoDoc ->
+                                                photoDoc.reference.delete()
                                             }
-                                            .addOnFailureListener { e ->
-                                                android.util.Log.e("GroupDelete", "Failed to delete for user $memberId: ${e.message}")
-                                                android.widget.Toast.makeText(
-                                                    context,
-                                                    "[$memberId]의 groups에서 삭제 실패: ${e.message}",
-                                                    android.widget.Toast.LENGTH_LONG
-                                                ).show()
-                                            }
-                                    }
-                                    FirebaseFirestore.getInstance().collection("groups").document(groupToDelete.id)
-                                        .delete()
-                                        .addOnSuccessListener {
-                                            android.util.Log.i("GroupDelete", "그룹 문서 삭제 성공")
-                                            android.widget.Toast.makeText(
-                                                context,
-                                                "그룹 문서 삭제 성공",
-                                                android.widget.Toast.LENGTH_SHORT
-                                            ).show()
+                                            
+                                            // 모든 이미지 삭제 완료 후 그룹 관련 데이터 삭제
+                                            com.google.android.gms.tasks.Tasks.whenAll(deletePhotoTasks)
+                                                .addOnSuccessListener {
+                                                    android.util.Log.i("GroupDelete", "그룹 캘린더 이미지 삭제 완료")
+                                                    
+                                                    // 각 멤버의 users/{userId}/groups/{groupId} 삭제
+                                                    val deleteMemberTasks = members.map { memberId ->
+                                                        FirebaseFirestore.getInstance().collection("users")
+                                                            .document(memberId)
+                                                            .collection("groups")
+                                                            .document(groupToDelete.id)
+                                                            .delete()
+                                                    }
+                                                    
+                                                    // 모든 멤버 그룹 참조 삭제 완료 후 그룹 문서 삭제
+                                                    com.google.android.gms.tasks.Tasks.whenAll(deleteMemberTasks)
+                                                        .addOnSuccessListener {
+                                                            android.util.Log.i("GroupDelete", "모든 멤버 그룹 참조 삭제 완료")
+                                                            
+                                                            // 마지막으로 그룹 문서 삭제
+                                                            FirebaseFirestore.getInstance().collection("groups")
+                                                                .document(groupToDelete.id)
+                                                                .delete()
+                                                                .addOnSuccessListener {
+                                                                    android.util.Log.i("GroupDelete", "그룹 문서 삭제 성공")
+                                                                    android.widget.Toast.makeText(
+                                                                        context,
+                                                                        "${groupToDelete.name} 그룹이 완전히 삭제되었습니다",
+                                                                        android.widget.Toast.LENGTH_SHORT
+                                                                    ).show()
+                                                                    
+                                                                    // UI에서 그룹 제거
+                                                                    groups.remove(groupToDelete)
+                                                                    if (selectedGroupId == groupToDelete.id) {
+                                                                        selectedGroupId = null
+                                                                    }
+                                                                }
+                                                                .addOnFailureListener { e ->
+                                                                    android.util.Log.e("GroupDelete", "그룹 문서 삭제 실패: ${e.message}")
+                                                                    android.widget.Toast.makeText(
+                                                                        context,
+                                                                        "그룹 문서 삭제 실패: ${e.message}",
+                                                                        android.widget.Toast.LENGTH_LONG
+                                                                    ).show()
+                                                                }
+                                                        }
+                                                        .addOnFailureListener { e ->
+                                                            android.util.Log.e("GroupDelete", "멤버 그룹 참조 삭제 실패: ${e.message}")
+                                                            android.widget.Toast.makeText(
+                                                                context,
+                                                                "멤버 그룹 참조 삭제 실패: ${e.message}",
+                                                                android.widget.Toast.LENGTH_LONG
+                                                            ).show()
+                                                        }
+                                                }
+                                                .addOnFailureListener { e ->
+                                                    android.util.Log.e("GroupDelete", "그룹 캘린더 이미지 삭제 실패: ${e.message}")
+                                                    android.widget.Toast.makeText(
+                                                        context,
+                                                        "그룹 캘린더 이미지 삭제 실패: ${e.message}",
+                                                        android.widget.Toast.LENGTH_LONG
+                                                    ).show()
+                                                }
                                         }
                                         .addOnFailureListener { e ->
-                                            android.util.Log.e("GroupDelete", "그룹 문서 삭제 실패: ${e.message}")
+                                            android.util.Log.e("GroupDelete", "그룹 캘린더 이미지 조회 실패: ${e.message}")
                                             android.widget.Toast.makeText(
                                                 context,
-                                                "그룹 문서 삭제 실패: ${e.message}",
+                                                "그룹 캘린더 이미지 조회 실패: ${e.message}",
                                                 android.widget.Toast.LENGTH_LONG
                                             ).show()
                                         }
-                                    groups.remove(groupToDelete)
-                                    if (selectedGroupId == groupToDelete.id) {
-                                        selectedGroupId = null
-                                    }
                                 }.addOnFailureListener { e ->
                                     android.util.Log.e("GroupDelete", "Failed to fetch group doc: ${e.message}")
                                     android.widget.Toast.makeText(
@@ -285,8 +335,45 @@ fun GroupScreen(navController: NavController) {
                                     groupDocRef.get().addOnSuccessListener { doc ->
                                         val members = (doc.get("members") as? List<String>)?.toMutableList() ?: groupToLeave.members.toMutableList()
                                         members.remove(currentUserId)
-                                        FirebaseFirestore.getInstance().collection("groups").document(groupToLeave.id)
-                                            .update("members", members)
+                                        
+                                        if (members.isEmpty()) {
+                                            // 멤버가 없으면 그룹 완전 삭제
+                                            FirebaseFirestore.getInstance().collection("groups")
+                                                .document(groupToLeave.id)
+                                                .delete()
+                                                .addOnSuccessListener {
+                                                    // 그룹 캘린더의 사진들 삭제
+                                                    FirebaseFirestore.getInstance().collection("groups")
+                                                        .document(groupToLeave.id)
+                                                        .collection("photos")
+                                                        .get()
+                                                        .addOnSuccessListener { photosSnapshot ->
+                                                            photosSnapshot.documents.forEach { photoDoc ->
+                                                                FirebaseFirestore.getInstance().collection("groups")
+                                                                    .document(groupToLeave.id)
+                                                                    .collection("photos")
+                                                                    .document(photoDoc.id)
+                                                                    .delete()
+                                                            }
+                                                        }
+                                                    
+                                                    // 모든 사용자의 개인 그룹 목록에서도 해당 그룹 삭제
+                                                    FirebaseFirestore.getInstance().collection("users").get()
+                                                        .addOnSuccessListener { usersSnapshot ->
+                                                            usersSnapshot.documents.forEach { userDoc ->
+                                                                FirebaseFirestore.getInstance().collection("users")
+                                                                    .document(userDoc.id)
+                                                                    .collection("groups")
+                                                                    .document(groupToLeave.id)
+                                                                    .delete()
+                                                            }
+                                                        }
+                                                }
+                                        } else {
+                                            // 멤버가 있으면 멤버 목록만 업데이트
+                                            FirebaseFirestore.getInstance().collection("groups").document(groupToLeave.id)
+                                                .update("members", members)
+                                        }
                                     }
                                     if (selectedGroupId == groupToLeave.id) {
                                         selectedGroupId = null
@@ -490,6 +577,7 @@ fun GroupDetailPanel(
     }
 
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showLeaveDialog by remember { mutableStateOf(false) }
 
     // 상세정보 컨텐츠 (verticalScroll 제거)
     val targetWidth = if (isExpanded) screenWidth * 0.95f else 0.dp
@@ -636,7 +724,9 @@ fun GroupDetailPanel(
                         }
                     } else {
                         TextButton(
-                            onClick = { onLeaveGroup(group) },
+                            onClick = { 
+                                showLeaveDialog = true 
+                            },
                             modifier = Modifier.align(Alignment.Start)
                         ) {
                             Icon(
@@ -716,52 +806,87 @@ fun GroupDetailPanel(
             confirmButton = {
                 Button(
                     onClick = {
-                        // 그룹 초대 로직 (프로필과 동일)
-                        val groupName = group.name
-                        val groupNote = group.note
-                        val groupCreator = group.creator
-                        val groupMembers = group.members
-                        val groupId = group.id
-                        val groupData = mapOf(
-                            "groupId" to groupId,
-                            "name" to groupName,
-                            "note" to groupNote,
-                            "creator" to groupCreator,
-                            "members" to groupMembers
-                        )
-                        selectedFriends.forEach { friendId ->
-                            // Firestore groupInvites
-                            FirebaseFirestore.getInstance().collection("users")
-                                .document(friendId)
-                                .collection("groupInvites")
-                                .document(groupId)
-                                .set(groupData)
-                            // 알림 전송 (Firestore)
-                            val inviteNotification = mapOf(
-                                "type" to "groupInvite",
-                                "fromUserId" to (currentUserId ?: ""),
-                                "fromUserName" to (FirebaseAuth.getInstance().currentUser?.displayName ?: FirebaseAuth.getInstance().currentUser?.email ?: currentUserId ?: ""),
-                                "groupId" to groupId,
-                                "groupName" to groupName,
-                                "timestamp" to System.currentTimeMillis()
-                            )
-                            FirebaseFirestore.getInstance().collection("users")
-                                .document(friendId)
-                                .collection("notifications")
-                                .add(inviteNotification)
-                            // 알림 전송 (Realtime DB)
-                            val ref = FirebaseDatabase.getInstance().reference
-                                .child("notifications")
-                                .child(friendId)
-                                .push()
-                            val notificationId = ref.key ?: ""
-                            val inviteNotificationWithId = inviteNotification.toMutableMap()
-                            inviteNotificationWithId["id"] = notificationId
-                            ref.setValue(inviteNotificationWithId)
+                        // 코루틴 스코프에서 비동기 작업 실행
+                        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                            try {
+                                // 그룹 초대 로직 (프로필과 동일)
+                                val groupName = group.name
+                                val groupNote = group.note
+                                val groupCreator = group.creator
+                                val groupMembers = group.members
+                                val groupId = group.id
+                                val groupData = mapOf(
+                                    "groupId" to groupId,
+                                    "name" to groupName,
+                                    "note" to groupNote,
+                                    "creator" to groupCreator,
+                                    "members" to groupMembers
+                                )
+                                // 현재 사용자 정보를 Firestore에서 가져오기
+                                if (currentUserId == null) {
+                                    println("GroupScreen: currentUserId is null")
+                                    return@launch
+                                }
+                                
+                                val currentUserDoc = FirebaseFirestore.getInstance().collection("users").document(currentUserId).get().await()
+                                val currentUserName = currentUserDoc.getString("name") ?: ""
+                                val currentUserEmail = currentUserDoc.getString("email") ?: ""
+                                
+                                // fromUserName: name > email > uid 순서로 표시
+                                val fromUserName = when {
+                                    currentUserName.isNotEmpty() -> currentUserName
+                                    currentUserEmail.isNotEmpty() -> currentUserEmail
+                                    else -> currentUserId
+                                }
+                                
+                                println("GroupScreen: fromUserName determined: $fromUserName")
+                                
+                                selectedFriends.forEach { friendId ->
+                                    println("GroupScreen: Sending group invite to $friendId for group $groupId")
+                                    // Firestore groupInvites
+                                    FirebaseFirestore.getInstance().collection("users")
+                                        .document(friendId)
+                                        .collection("groupInvites")
+                                        .document(groupId)
+                                        .set(groupData)
+                                    // 알림 전송 (Firestore)
+                                    val inviteNotification = mapOf(
+                                        "type" to "groupInvite",
+                                        "fromUserId" to (currentUserId ?: ""),
+                                        "fromUserName" to fromUserName,
+                                        "groupId" to groupId,
+                                        "groupName" to groupName,
+                                        "timestamp" to System.currentTimeMillis()
+                                    )
+                                    println("GroupScreen: Adding notification to $friendId - type: groupInvite, groupId: $groupId, fromUserName: $fromUserName")
+                                    FirebaseFirestore.getInstance().collection("users")
+                                        .document(friendId)
+                                        .collection("notifications")
+                                        .add(inviteNotification)
+                                    // 알림 전송 (Realtime DB)
+                                    val ref = FirebaseDatabase.getInstance().reference
+                                        .child("notifications")
+                                        .child(friendId)
+                                        .push()
+                                    val notificationId = ref.key ?: ""
+                                    val inviteNotificationWithId = inviteNotification.toMutableMap()
+                                    inviteNotificationWithId["id"] = notificationId
+                                    ref.setValue(inviteNotificationWithId)
+                                }
+                                
+                                // UI 업데이트는 메인 스레드에서
+                                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                    showAddMemberDialog = false
+                                    selectedFriends = emptySet()
+                                    android.widget.Toast.makeText(context, "초대가 전송되었습니다", android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                            } catch (e: Exception) {
+                                // 에러 처리
+                                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                    android.widget.Toast.makeText(context, "초대 전송 중 오류가 발생했습니다: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                            }
                         }
-                        showAddMemberDialog = false
-                        selectedFriends = emptySet()
-                        android.widget.Toast.makeText(context, "초대가 전송되었습니다", android.widget.Toast.LENGTH_SHORT).show()
                     },
                     enabled = selectedFriends.isNotEmpty()
                 ) {
@@ -781,7 +906,7 @@ fun GroupDetailPanel(
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
             title = { Text("정말로 삭제하시겠습니까?") },
-            text = { Text("그룹을 삭제하면 모든 멤버가 그룹을 사용할 수 없습니다.\n삭제된 그룹은 복구할 수 없습니다.") },
+            text = { Text("삭제된 그룹은 복구할 수 없습니다.") },
             confirmButton = {
                 TextButton(onClick = {
                     showDeleteDialog = false
@@ -792,6 +917,30 @@ fun GroupDetailPanel(
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("취소")
+                }
+            }
+        )
+    }
+    
+    // 탈퇴 확인 다이얼로그
+    if (showLeaveDialog) {
+        AlertDialog(
+            onDismissRequest = { showLeaveDialog = false },
+            title = { Text("정말 탈퇴하시겠습니까?") },
+            text = { 
+                Text("더 이상 ${group.name} 그룹에 접근할 수 없습니다.")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showLeaveDialog = false
+                    onLeaveGroup(group)
+                }) {
+                    Text("탈퇴")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLeaveDialog = false }) {
                     Text("취소")
                 }
             }
@@ -849,9 +998,9 @@ fun MemberItem(
                 )
             )
         } else {
-            val isRecordWithMe = memberEmail.endsWith("@recordwith.me")
+            // displayText: name > email > uid 순서로 표시
             val displayText = when {
-                isRecordWithMe && memberName.isNotEmpty() -> memberName
+                memberName.isNotEmpty() -> memberName
                 memberEmail.isNotEmpty() -> memberEmail
                 else -> memberId
             }

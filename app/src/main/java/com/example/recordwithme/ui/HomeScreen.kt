@@ -23,13 +23,25 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.Card
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -37,12 +49,28 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -51,13 +79,8 @@ import com.google.accompanist.flowlayout.FlowRow
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.input.pointer.pointerInput
 import kotlinx.coroutines.tasks.await
-import java.util.*
+import java.util.Calendar
 
 data class Photo(val url: String, val date: String, val isBase64: Boolean = false)
 data class Group(
@@ -194,7 +217,7 @@ fun HomeScreen() {
                 .fillMaxSize()
                 .background(Color.White)
         ) {
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(4.dp))
             LazyRow(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -262,12 +285,13 @@ fun HomeScreen() {
                             ) {
                                 if (group.thumbnailUrl != null) {
                                     if (group.thumbnailIsBase64) {
-                                        Base64Image(group.thumbnailUrl, Modifier.size(64.dp).clip(CircleShape))
+                                        Base64Image(group.thumbnailUrl, Modifier.fillMaxSize().clip(CircleShape))
                                     } else if (group.thumbnailUrl.startsWith("https://")) {
                                         AsyncImage(
                                             model = group.thumbnailUrl,
                                             contentDescription = "썸네일",
-                                            modifier = Modifier.size(64.dp).clip(CircleShape)
+                                            modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                            contentScale = ContentScale.Crop
                                         )
                                     }
                                 }
@@ -279,7 +303,7 @@ fun HomeScreen() {
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(3.dp)) // 그룹 리스트랑 그룹 대표 이미지 사이 padding
 
             val photosToShow = if (selectedGroup != null) selectedGroupPhotos else allPhotos
             
@@ -302,15 +326,20 @@ fun HomeScreen() {
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
-                    contentPadding = PaddingValues(bottom = 32.dp)
+                    contentPadding = PaddingValues(bottom = 16.dp)
                 ) {
                     item {
-                        Box(modifier = Modifier.fillMaxWidth().height(220.dp)) {
-                            Card(modifier = Modifier.fillMaxSize(), elevation = 4.dp) {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().height(220.dp)
+                        ) {
+                            Card(
+                                modifier = Modifier.fillMaxSize(),
+                                colors = CardDefaults.cardColors(containerColor = Color.White)
+                            ) {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .background(Color(0xFFE0E0E0)),
+                                        .background(Color(0x570986E7)),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     if (representativePhoto != null) {
@@ -320,13 +349,33 @@ fun HomeScreen() {
                                     }
                                 }
                             }
+                            // 그룹 이름 오버레이 (Box의 자식, 좌측 하단)
+                            if (selectedGroup != null) {
+                                Text(
+                                    text = selectedGroup!!.name,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 50.sp,
+                                    fontStyle = FontStyle.Italic,
+                                    modifier = Modifier
+                                        .align(Alignment.BottomStart)
+                                        .padding(20.dp)
+                                        .background(Color.Transparent)
+                                        .padding(horizontal = 20.dp, vertical = 8.dp)
+                                )
+                            }
                         }
                         Spacer(modifier = Modifier.height(16.dp))
                     }
                     for ((date, photos) in photosByDate) {
                         item {
                             Spacer(modifier = Modifier.height(16.dp))
-                            Text(date, color = Color.Black, fontSize = 25.sp, modifier = Modifier.padding(start = 16.dp))
+                            Text(
+                                date,
+                                color = Color.Black,
+                                fontSize = 16.sp,
+                                modifier = Modifier.padding(start = 16.dp)
+                            )
                             Spacer(modifier = Modifier.height(8.dp))
                             FlowRow(
                                 modifier = Modifier.padding(start = 16.dp),
@@ -350,7 +399,8 @@ fun HomeScreen() {
                                             AsyncImage(
                                                 model = photo.url,
                                                 contentDescription = "사진",
-                                                modifier = Modifier.size(110.dp)
+                                                modifier = Modifier.size(110.dp),
+                                                contentScale = ContentScale.Crop
                                             )
                                         } else {
                                             Text("이미지 오류")
@@ -381,6 +431,8 @@ fun HomeScreen() {
                 Icon(Icons.Filled.Add, contentDescription = "사진 추가", modifier = Modifier.size(32.dp))
             }
         }
+        
+
 
         if (selectedPhotoUrl != null) {
             val currentPhotos = selectedGroupPhotos.ifEmpty { allPhotos }
@@ -407,7 +459,8 @@ fun HomeScreen() {
                                 .fillMaxWidth()
                                 .aspectRatio(1f)
                                 .background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
-                                .padding(8.dp)
+                                .padding(8.dp),
+                            contentScale = ContentScale.Fit
                         )
                     } else {
                         AsyncImage(
@@ -417,7 +470,8 @@ fun HomeScreen() {
                                 .fillMaxWidth()
                                 .aspectRatio(1f)
                                 .background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
-                                .padding(8.dp)
+                                .padding(8.dp),
+                            contentScale = ContentScale.Fit
                         )
                     }
                 }
@@ -622,7 +676,7 @@ private fun uploadImageToFirebase(
 }
 
 @Composable
-fun Base64Image(base64String: String, modifier: Modifier = Modifier) {
+fun Base64Image(base64String: String, modifier: Modifier = Modifier, contentScale: ContentScale = ContentScale.Crop) {
     var bitmap by remember(base64String) { mutableStateOf<android.graphics.Bitmap?>(null) }
 
     LaunchedEffect(base64String) {
@@ -635,7 +689,12 @@ fun Base64Image(base64String: String, modifier: Modifier = Modifier) {
     }
 
     if (bitmap != null) {
-        Image(bitmap = bitmap!!.asImageBitmap(), contentDescription = null, modifier = modifier)
+        Image(
+            bitmap = bitmap!!.asImageBitmap(),
+            contentDescription = null,
+            modifier = modifier,
+            contentScale = contentScale
+        )
     } else {
         Box(modifier = modifier.background(Color.LightGray), contentAlignment = Alignment.Center) {
             Text("이미지 로딩 중...")
@@ -654,12 +713,14 @@ fun AnimatedRepresentativePhoto(url: String?, isBase64: Boolean = false) {
     ) { targetUrl ->
         if (targetUrl != null) {
             if (isBase64) {
-                Base64Image(targetUrl, Modifier.size(200.dp))
+                Base64Image(targetUrl, modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit)
             } else if (targetUrl.startsWith("https://")) {
                 AsyncImage(
                     model = targetUrl,
                     contentDescription = "대표사진",
-                    modifier = Modifier.size(200.dp)
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit
                 )
             } else {
                 Text("대표사진 자리", color = Color.Gray)
@@ -704,3 +765,5 @@ private fun uploadThumbnailToFirestore(
         Toast.makeText(context, "썸네일 처리 실패: ${e.message}", Toast.LENGTH_SHORT).show()
     }
 }
+
+

@@ -1304,28 +1304,28 @@ fun ProfileScreen(
                                 if (currentUser != null) {
                                     currentUser.delete().await()
                                 }
-                                
+
                                 // 1. 모든 groups/*/members에서 해당 uid를 삭제 (메인 문서 삭제 전에)
                                 val groupsSnapshot = firestore.collection("groups").get().await()
                                 groupsSnapshot.documents.forEach { groupDoc ->
                                     val members = groupDoc.get("members") as? List<String> ?: emptyList()
                                     if (members.contains(currentUserId)) {
                                         val updatedMembers = members.filter { it != currentUserId }
-                                        
+
                                         if (updatedMembers.isEmpty()) {
                                             // 멤버가 없으면 그룹 완전 삭제
                                             firestore.collection("groups")
                                                 .document(groupDoc.id)
                                                 .delete()
                                                 .await()
-                                            
+
                                             // 그룹 캘린더의 사진들 삭제
                                             val photosSnapshot = firestore.collection("groups")
                                                 .document(groupDoc.id)
                                                 .collection("photos")
                                                 .get()
                                                 .await()
-                                            
+
                                             photosSnapshot.documents.forEach { photoDoc ->
                                                 firestore.collection("groups")
                                                     .document(groupDoc.id)
@@ -1334,7 +1334,7 @@ fun ProfileScreen(
                                                     .delete()
                                                     .await()
                                             }
-                                            
+
                                             // 모든 사용자의 개인 그룹 목록에서도 해당 그룹 삭제
                                             val allUsersSnapshot = firestore.collection("users").get().await()
                                             allUsersSnapshot.documents.forEach { userDoc ->
@@ -1353,7 +1353,7 @@ fun ProfileScreen(
                                         }
                                     }
                                 }
-                                
+
                                 // 2. 모든 users/*/groups/{groupId}에서 탈퇴한 사용자 삭제 (메인 문서 삭제 전에)
                                 val allUsersSnapshot = firestore.collection("users").get().await()
                                 allUsersSnapshot.documents.forEach { userDoc ->
@@ -1362,7 +1362,7 @@ fun ProfileScreen(
                                         .collection("groups")
                                         .get()
                                         .await()
-                                    
+
                                     userGroupsSnapshot.documents.forEach { groupDoc ->
                                         val groupMembers = groupDoc.get("members") as? List<String> ?: emptyList()
                                         if (groupMembers.contains(currentUserId)) {
@@ -1376,14 +1376,14 @@ fun ProfileScreen(
                                         }
                                     }
                                 }
-                                
+
                                 // 3. 탈퇴한 사용자의 groups 컬렉션 삭제
                                 val currentUserGroupsSnapshot = firestore.collection("users")
                                     .document(currentUserId)
                                     .collection("groups")
                                     .get()
                                     .await()
-                                
+
                                 currentUserGroupsSnapshot.documents.forEach { groupDoc ->
                                     firestore.collection("users")
                                         .document(currentUserId)
@@ -1392,14 +1392,14 @@ fun ProfileScreen(
                                         .delete()
                                         .await()
                                 }
-                                
+
                                 // 4. 탈퇴한 사용자의 친구 목록 삭제
                                 val currentUserFriendsSnapshot = firestore.collection("users")
                                     .document(currentUserId)
                                     .collection("friends")
                                     .get()
                                     .await()
-                                
+
                                 currentUserFriendsSnapshot.documents.forEach { friendDoc ->
                                     firestore.collection("users")
                                         .document(currentUserId)
@@ -1415,7 +1415,7 @@ fun ProfileScreen(
                                     .collection("notifications")
                                     .get()
                                     .await()
-                                
+
                                 currentUserNotificationsSnapshot.documents.forEach { notificationDoc ->
                                     firestore.collection("users")
                                         .document(currentUserId)
@@ -1424,14 +1424,14 @@ fun ProfileScreen(
                                         .delete()
                                         .await()
                                 }
-                                
+
                                 // 6. 탈퇴한 사용자의 그룹 초대 삭제
                                 val currentUserGroupInvitesSnapshot = firestore.collection("users")
                                     .document(currentUserId)
                                     .collection("groupInvites")
                                     .get()
                                     .await()
-                                
+
                                 currentUserGroupInvitesSnapshot.documents.forEach { inviteDoc ->
                                     firestore.collection("users")
                                         .document(currentUserId)
@@ -1440,7 +1440,7 @@ fun ProfileScreen(
                                         .delete()
                                         .await()
                                 }
-                                
+
                                 // 7. users/{uid} 메인 문서 삭제 (모든 참조 제거 후)
                                 firestore.collection("users").document(currentUserId).delete().await()
 

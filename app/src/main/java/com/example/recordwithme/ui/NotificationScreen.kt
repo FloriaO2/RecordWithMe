@@ -113,7 +113,6 @@ fun FriendRequestItem(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
         shape = RoundedCornerShape(12.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         colors = CardDefaults.cardColors(
             containerColor = Color(0xFFFEFEFE) // 거의 흰색에 가까운 밝은 색
         )
@@ -216,7 +215,6 @@ fun GroupInviteItem(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
         shape = RoundedCornerShape(12.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         colors = CardDefaults.cardColors(
             containerColor = Color(0xFFFEFEFE)
         )
@@ -317,7 +315,6 @@ fun GeneralNotificationItem(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
         shape = RoundedCornerShape(12.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         colors = CardDefaults.cardColors(
             containerColor = Color(0xFFFEFEFE) // 거의 흰색에 가까운 밝은 색
         )
@@ -330,12 +327,16 @@ fun GeneralNotificationItem(
             val icon = when (notification.type) {
                 "friend_accepted" -> Icons.Filled.CheckCircle
                 "friend_rejected" -> Icons.Filled.Cancel
+                "groupInviteAccepted" -> Icons.Filled.CheckCircle
+                "groupInviteRejected" -> Icons.Filled.Cancel
                 else -> Icons.Filled.Notifications
             }
             
             val iconColor = when (notification.type) {
                 "friend_accepted" -> Color(0xFF4CAF50)
                 "friend_rejected" -> Color(0xFFF44336)
+                "groupInviteAccepted" -> Color(0xFF4CAF50)
+                "groupInviteRejected" -> Color(0xFFF44336)
                 else -> Color(0xFF2196F3)
             }
             
@@ -810,7 +811,7 @@ fun NotificationScreen(
                 modifier = Modifier.align(Alignment.CenterStart)
             )
         }
-        
+        Spacer(modifier = Modifier.height(8.dp))
         // 알림 목록
         if (loading) {
             Box(

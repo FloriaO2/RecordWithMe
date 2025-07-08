@@ -609,7 +609,7 @@ fun GroupDetailPanel(
                             fontSize = (screenWidth.value * 0.04f).sp,
                             fontWeight = FontWeight.SemiBold
                         ),
-                        modifier = Modifier.padding(bottom = (screenHeight.value * 0.03f).dp)
+                        modifier = Modifier.padding(bottom = (screenHeight.value * 0.03f).dp, start = (screenWidth.value * 0.02f).dp)
                     )
                     Text(
                         text = group.note,
@@ -617,7 +617,7 @@ fun GroupDetailPanel(
                             fontSize = (screenWidth.value * 0.035f).sp,
                             color = Color.Gray
                         ),
-
+                        modifier = Modifier.padding(start = (screenWidth.value * 0.02f).dp)
                     )
                 }
 
@@ -704,28 +704,9 @@ fun GroupDetailPanel(
                             color = MaterialTheme.colorScheme.primary
                         )
                     }
-                    if (isCreator) {
                         TextButton(
-                            onClick = { showDeleteDialog = true },
-                            modifier = Modifier.align(Alignment.Start)
-                        ) {
-                            Icon(
-                                Icons.Filled.Delete,
-                                contentDescription = "Delete",
-                                modifier = Modifier.size((screenWidth.value * 0.04f).dp),
-                                tint = Color.Red
-                            )
-                            Spacer(modifier = Modifier.width((screenWidth.value * 0.02f).dp))
-                            Text(
-                                text = "삭제",
-                                fontSize = (screenWidth.value * 0.035f).sp,
-                                color = Color.Red
-                            )
-                        }
-                    } else {
-                        TextButton(
-                            onClick = { 
-                                showLeaveDialog = true 
+                            onClick = {
+                                showLeaveDialog = true
                             },
                             modifier = Modifier.align(Alignment.Start)
                         ) {
@@ -742,7 +723,6 @@ fun GroupDetailPanel(
                                 color = Color.Red
                             )
                         }
-                    }
 
                     TextButton(
                         onClick = {

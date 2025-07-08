@@ -51,7 +51,6 @@ import com.google.accompanist.flowlayout.FlowRow
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
@@ -60,6 +59,7 @@ import kotlinx.coroutines.tasks.await
 import java.util.*
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import com.example.recordwithme.MainActivity
 
 data class Photo(val url: String, val date: String, val isBase64: Boolean = false)
 data class Group(
@@ -515,6 +515,16 @@ fun HomeScreen() {
                     }
                 }
             }
+        }
+
+        // 예시: 화면 하단에 Spotify 로그인 버튼 추가
+        FloatingActionButton(
+            onClick = { (context as? MainActivity)?.startSpotifyAuth() },
+            containerColor = Color(0xFF1DB954),
+            contentColor = Color.White,
+            modifier = Modifier.align(Alignment.BottomStart).padding(24.dp).size(64.dp)
+        ) {
+            Text("Spotify", color = Color.White)
         }
     }
 }

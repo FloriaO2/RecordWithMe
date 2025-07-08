@@ -18,6 +18,14 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        manifestPlaceholders["appAuthRedirectScheme"] = "com.example.recordwithme"
+
+        // local.properties에서 환경변수 읽기
+        val visionApiKey: String? = project.rootProject.file("local.properties")
+            .readLines()
+            .find { it.startsWith("VISION_API_KEY=") }
+            ?.substringAfter("=")
+        buildConfigField("String", "VISION_API_KEY", "\"${visionApiKey ?: ""}\"")
     }
 
     buildTypes {
@@ -40,6 +48,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     composeOptions {
@@ -48,6 +57,8 @@ android {
 }
 
 dependencies {
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+    implementation("net.openid:appauth:0.11.1")
     implementation("com.google.accompanist:accompanist-flowlayout:0.30.1")
     implementation("androidx.activity:activity-compose:1.7.2")
     implementation("androidx.compose.ui:ui:1.5.3")

@@ -77,6 +77,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import androidx.compose.foundation.layout.heightIn
 
 // 데이터 클래스들
 data class Friend(
@@ -247,8 +248,10 @@ fun FriendSearchDialog(
                             Text("검색어를 입력하세요", color = Color.Gray)
                         }
                     } else {
-                        Column {
-                            searchResults.forEach { user ->
+                        androidx.compose.foundation.lazy.LazyColumn(
+                            modifier = Modifier.heightIn(max = (screenHeight.value * 0.35f).dp)
+                        ) {
+                            items(searchResults) { user ->
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -310,16 +313,6 @@ fun FriendSearchDialog(
                                                                 .document(user.id)
                                                                 .collection("notifications")
                                                                 .add(notificationData)
-                                                                .addOnSuccessListener { doc ->
-                                                                    // ✅ Realtime Database에도 저장 (알림용)
-                                                                    val realtimeDb = FirebaseDatabase.getInstance().reference
-                                                                    val realtimeNotificationData = notificationData.toMutableMap()
-                                                                    realtimeNotificationData["id"] = doc.id
-                                                                    realtimeDb.child("notifications")
-                                                                        .child(user.id)  // 수신자 ID 경로
-                                                                        .child(doc.id)
-                                                                        .setValue(realtimeNotificationData)
-                                                                }
 
                                                             kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
                                                                 android.widget.Toast.makeText(

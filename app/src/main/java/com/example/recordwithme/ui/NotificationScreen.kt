@@ -352,6 +352,7 @@ fun GeneralNotificationItem(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = when (notification.type) {
+                        "friendRequest" -> "${getDisplayName(notification.fromUserName)}님이 친구 요청을 보냈습니다"
                         "friend_accepted" -> "${getDisplayName(notification.fromUserName)}님이 친구 요청을 수락했습니다"
                         "friend_rejected" -> "${getDisplayName(notification.fromUserName)}님이 친구 요청을 거절했습니다"
                         "groupInviteAccepted" -> "${getDisplayName(notification.fromUserName)}님이 ${notification.groupName ?: "그룹"} 그룹 초대를 수락했습니다"
@@ -427,18 +428,17 @@ fun NotificationScreen(
     var showDialog by remember { mutableStateOf<Notification?>(null) }
     var loading by remember { mutableStateOf(true) }
     
-    // Realtime Database 리스너 설정
+    // 알림 불러오기: Firestore와 Realtime DB 모두에서 알림을 불러와 합침
     DisposableEffect(currentUserId) {
         val realtimeDb = FirebaseDatabase.getInstance().reference
         val notificationsRef = realtimeDb.child("notifications").child(currentUserId)
-        
+
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val newNotifications = mutableListOf<Notification>()
-                
                 for (childSnapshot in snapshot.children) {
                     val id = childSnapshot.key ?: ""
-                    val type = childSnapshot.child("type").getValue(String::class.java) ?: "friend_request"
+                    val type = childSnapshot.child("type").getValue(String::class.java) ?: "friendRequest"
                     val fromUserId = childSnapshot.child("fromUserId").getValue(String::class.java) ?: continue
                     val fromUserName = childSnapshot.child("fromUserName").getValue(String::class.java) ?: continue
                     val timestamp = childSnapshot.child("timestamp").getValue(Long::class.java) ?: continue
@@ -456,7 +456,6 @@ fun NotificationScreen(
                         )
                     )
                 }
-                
                 // Firestore에서 기존 알림들도 가져오기 (비동기 처리)
                 firestore.collection("users")
                     .document(currentUserId)
@@ -468,7 +467,6 @@ fun NotificationScreen(
                             val fromUserId = doc.getString("fromUserId") ?: return@mapNotNull null
                             val fromUserName = doc.getString("fromUserName") ?: return@mapNotNull null
                             val timestamp = doc.getLong("timestamp") ?: return@mapNotNull null
-                            
                             Notification(
                                 id = "fs_${doc.id}",
                                 type = type,
@@ -477,10 +475,10 @@ fun NotificationScreen(
                                 timestamp = timestamp
                             )
                         }
-                        
-                        // 모든 알림을 합치고 시간순으로 정렬
-                        notifications = (newNotifications + firestoreNotifications)
-                            .sortedByDescending { it.timestamp }
+                        // 중복 제거: id 기준
+                        val merged = (newNotifications + firestoreNotifications)
+                        val deduped = merged.distinctBy { it.id }
+                        notifications = deduped.sortedByDescending { it.timestamp }
                         loading = false
                     }
                     .addOnFailureListener { e ->
@@ -488,15 +486,11 @@ fun NotificationScreen(
                         loading = false
                     }
             }
-            
             override fun onCancelled(error: DatabaseError) {
                 loading = false
             }
         }
-        
         notificationsRef.addValueEventListener(listener)
-        
-        // Cleanup
         onDispose {
             notificationsRef.removeEventListener(listener)
         }
@@ -505,6 +499,9 @@ fun NotificationScreen(
     // 친구 요청 수락 처리
     val handleAccept: (Notification) -> Unit = { notification ->
         try {
+            // UI에서 먼저 제거
+            notifications = notifications.filter { it.id != notification.id }
+
             // Firestore에 친구 관계 추가
             val friendData = mapOf(
                 "name" to notification.fromUserName,
@@ -529,17 +526,30 @@ fun NotificationScreen(
                 ))
             
             // 친구 요청 삭제
+            val firestoreDocId = if (notification.id.startsWith("fs_")) {
+                notification.id.removePrefix("fs_")
+            } else {
+                notification.id
+            }
+            val realtimeDbId = if (notification.id.startsWith("rt_")) {
+                notification.id.removePrefix("rt_")
+            } else {
+                notification.id
+            }
             firestore.collection("users")
                 .document(currentUserId)
                 .collection("friendRequests")
                 .document(notification.fromUserId)
                 .delete()
-            
-            // Realtime Database에서도 삭제
+            firestore.collection("users")
+                .document(currentUserId)
+                .collection("notifications")
+                .document(firestoreDocId)
+                .delete()
             FirebaseDatabase.getInstance().reference
                 .child("notifications")
                 .child(currentUserId)
-                .child(notification.id)
+                .child(realtimeDbId)
                 .removeValue()
             
             // 수락 알림을 요청한 사용자에게 전송
@@ -555,13 +565,6 @@ fun NotificationScreen(
                 .collection("notifications")
                 .add(acceptNotification)
             
-            // Realtime Database에도 수락 알림 저장
-            FirebaseDatabase.getInstance().reference
-                .child("notifications")
-                .child(notification.fromUserId)
-                .push()
-                .setValue(acceptNotification)
-            
             android.widget.Toast.makeText(context, "친구 요청을 수락했습니다", android.widget.Toast.LENGTH_SHORT).show()
             
         } catch (e: Exception) {
@@ -572,20 +575,36 @@ fun NotificationScreen(
     // 친구 요청 거절 처리
     val handleReject: (Notification) -> Unit = { notification ->
         try {
+            // 알림 리스트에서 바로 제거
+            notifications = notifications.filter { it.id != notification.id }
+
             // 친구 요청 삭제
+            val firestoreDocId = if (notification.id.startsWith("fs_")) {
+                notification.id.removePrefix("fs_")
+            } else {
+                notification.id
+            }
+            val realtimeDbId = if (notification.id.startsWith("rt_")) {
+                notification.id.removePrefix("rt_")
+            } else {
+                notification.id
+            }
             firestore.collection("users")
                 .document(currentUserId)
                 .collection("friendRequests")
                 .document(notification.fromUserId)
                 .delete()
-            
-            // Realtime Database에서도 삭제
+            firestore.collection("users")
+                .document(currentUserId)
+                .collection("notifications")
+                .document(firestoreDocId)
+                .delete()
             FirebaseDatabase.getInstance().reference
                 .child("notifications")
                 .child(currentUserId)
-                .child(notification.id)
+                .child(realtimeDbId)
                 .removeValue()
-            
+
             // 거절 알림을 요청한 사용자에게 전송
             val rejectNotification = mapOf(
                 "type" to "friend_rejected",
@@ -593,21 +612,14 @@ fun NotificationScreen(
                 "fromUserName" to (auth.currentUser?.displayName ?: auth.currentUser?.email ?: currentUserId),
                 "timestamp" to System.currentTimeMillis()
             )
-            
+
             firestore.collection("users")
                 .document(notification.fromUserId)
                 .collection("notifications")
                 .add(rejectNotification)
-            
-            // Realtime Database에도 거절 알림 저장
-            FirebaseDatabase.getInstance().reference
-                .child("notifications")
-                .child(notification.fromUserId)
-                .push()
-                .setValue(rejectNotification)
-            
+
             android.widget.Toast.makeText(context, "친구 요청을 거절했습니다", android.widget.Toast.LENGTH_SHORT).show()
-            
+
         } catch (e: Exception) {
             android.widget.Toast.makeText(context, "오류가 발생했습니다: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
         }
@@ -623,10 +635,25 @@ fun NotificationScreen(
             // 알림 리스트에서 해당 groupInvite 알림 제거
             notifications = notifications.filter { it.id != notification.id }
             // Realtime DB에서 해당 알림 삭제 (id가 push key와 일치)
+            val firestoreDocId = if (notification.id.startsWith("fs_")) {
+                notification.id.removePrefix("fs_")
+            } else {
+                notification.id
+            }
+            val realtimeDbId = if (notification.id.startsWith("rt_")) {
+                notification.id.removePrefix("rt_")
+            } else {
+                notification.id
+            }
+            firestore.collection("users")
+                .document(currentUserId)
+                .collection("notifications")
+                .document(firestoreDocId)
+                .delete()
             FirebaseDatabase.getInstance().reference
                 .child("notifications")
                 .child(currentUserId)
-                .child(notification.id)
+                .child(realtimeDbId)
                 .removeValue()
         } else {
             // Firestore groupInvites에서 초대 정보 삭제
@@ -682,10 +709,25 @@ fun NotificationScreen(
                     // 알림 리스트에서 해당 groupInvite 알림 제거
                     notifications = notifications.filter { it.id != notification.id }
                     // Realtime DB에서 해당 알림 삭제 (id가 push key와 일치)
+                    val firestoreDocId = if (notification.id.startsWith("fs_")) {
+                        notification.id.removePrefix("fs_")
+                    } else {
+                        notification.id
+                    }
+                    val realtimeDbId = if (notification.id.startsWith("rt_")) {
+                        notification.id.removePrefix("rt_")
+                    } else {
+                        notification.id
+                    }
+                    firestore.collection("users")
+                        .document(currentUserId)
+                        .collection("notifications")
+                        .document(firestoreDocId)
+                        .delete()
                     FirebaseDatabase.getInstance().reference
                         .child("notifications")
                         .child(currentUserId)
-                        .child(notification.id)
+                        .child(realtimeDbId)
                         .removeValue()
                 }
                 .addOnFailureListener { e ->
@@ -704,10 +746,25 @@ fun NotificationScreen(
             // 알림 리스트에서 해당 groupInvite 알림 제거
             notifications = notifications.filter { it.id != notification.id }
             // Realtime DB에서 해당 알림 삭제 (id가 push key와 일치)
+            val firestoreDocId = if (notification.id.startsWith("fs_")) {
+                notification.id.removePrefix("fs_")
+            } else {
+                notification.id
+            }
+            val realtimeDbId = if (notification.id.startsWith("rt_")) {
+                notification.id.removePrefix("rt_")
+            } else {
+                notification.id
+            }
+            firestore.collection("users")
+                .document(currentUserId)
+                .collection("notifications")
+                .document(firestoreDocId)
+                .delete()
             FirebaseDatabase.getInstance().reference
                 .child("notifications")
                 .child(currentUserId)
-                .child(notification.id)
+                .child(realtimeDbId)
                 .removeValue()
         } else {
             // Firestore groupInvites에서 초대 정보 삭제
@@ -750,10 +807,25 @@ fun NotificationScreen(
                     // 알림 리스트에서 해당 groupInvite 알림 제거
                     notifications = notifications.filter { it.id != notification.id }
                     // Realtime DB에서 해당 알림 삭제 (id가 push key와 일치)
+                    val firestoreDocId = if (notification.id.startsWith("fs_")) {
+                        notification.id.removePrefix("fs_")
+                    } else {
+                        notification.id
+                    }
+                    val realtimeDbId = if (notification.id.startsWith("rt_")) {
+                        notification.id.removePrefix("rt_")
+                    } else {
+                        notification.id
+                    }
+                    firestore.collection("users")
+                        .document(currentUserId)
+                        .collection("notifications")
+                        .document(firestoreDocId)
+                        .delete()
                     FirebaseDatabase.getInstance().reference
                         .child("notifications")
                         .child(currentUserId)
-                        .child(notification.id)
+                        .child(realtimeDbId)
                         .removeValue()
                 }
                 .addOnFailureListener { e ->
@@ -769,16 +841,25 @@ fun NotificationScreen(
             (notification.groupId.isNullOrBlank() || notification.groupName.isNullOrBlank())
         ) {
             // Firestore 알림 삭제
+            val firestoreDocId = if (notification.id.startsWith("fs_")) {
+                notification.id.removePrefix("fs_")
+            } else {
+                notification.id
+            }
+            val realtimeDbId = if (notification.id.startsWith("rt_")) {
+                notification.id.removePrefix("rt_")
+            } else {
+                notification.id
+            }
             firestore.collection("users")
                 .document(currentUserId)
                 .collection("notifications")
-                .document(notification.id)
+                .document(firestoreDocId)
                 .delete()
-            // Realtime DB 알림 삭제
-            com.google.firebase.database.FirebaseDatabase.getInstance().reference
+            FirebaseDatabase.getInstance().reference
                 .child("notifications")
                 .child(currentUserId)
-                .child(notification.id)
+                .child(realtimeDbId)
                 .removeValue()
         }
     }
@@ -855,17 +936,32 @@ fun NotificationScreen(
                                 // 리스트에서 삭제
                                 notifications = notifications.filter { it.id != notification.id }
                                 // DB에서 삭제
+                                val firestoreDocId = if (notification.id.startsWith("fs_")) {
+                                    notification.id.removePrefix("fs_")
+                                } else {
+                                    notification.id
+                                }
+                                val realtimeDbId = if (notification.id.startsWith("rt_")) {
+                                    notification.id.removePrefix("rt_")
+                                } else {
+                                    notification.id
+                                }
                                 when (notification.type) {
-                                    "friend_request" -> {
+                                    "friendRequest" -> {
                                         firestore.collection("users")
                                             .document(currentUserId)
                                             .collection("friendRequests")
                                             .document(notification.fromUserId)
                                             .delete()
+                                        firestore.collection("users")
+                                            .document(currentUserId)
+                                            .collection("notifications")
+                                            .document(firestoreDocId)
+                                            .delete()
                                         FirebaseDatabase.getInstance().reference
                                             .child("notifications")
                                             .child(currentUserId)
-                                            .child(notification.id)
+                                            .child(realtimeDbId)
                                             .removeValue()
                                     }
                                     "groupInvite" -> {
@@ -874,22 +970,27 @@ fun NotificationScreen(
                                             .collection("groupInvites")
                                             .document(notification.groupId ?: "")
                                             .delete()
+                                        firestore.collection("users")
+                                            .document(currentUserId)
+                                            .collection("notifications")
+                                            .document(firestoreDocId)
+                                            .delete()
                                         FirebaseDatabase.getInstance().reference
                                             .child("notifications")
                                             .child(currentUserId)
-                                            .child(notification.id)
+                                            .child(realtimeDbId)
                                             .removeValue()
                                     }
                                     else -> {
                                         firestore.collection("users")
                                             .document(currentUserId)
                                             .collection("notifications")
-                                            .document(notification.id)
+                                            .document(firestoreDocId)
                                             .delete()
                                         FirebaseDatabase.getInstance().reference
                                             .child("notifications")
                                             .child(currentUserId)
-                                            .child(notification.id)
+                                            .child(realtimeDbId)
                                             .removeValue()
                                     }
                                 }
@@ -908,7 +1009,7 @@ fun NotificationScreen(
                         dismissThresholds = { direction -> FractionalThreshold(0.5f) },
                         dismissContent = {
                             when (notification.type) {
-                                "friend_request" -> {
+                                "friendRequest" -> {
                                     FriendRequestItem(
                                         notification = notification,
                                         onAccept = handleAccept,

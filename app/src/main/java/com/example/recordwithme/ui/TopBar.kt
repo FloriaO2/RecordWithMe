@@ -25,7 +25,7 @@ import com.example.recordwithme.R
 @Composable
 fun TopBar(onMenuClick: () -> Unit) {
     Surface(
-        color = Color(0xFF0986E7), // 연갈색 배경
+        color = Color(0xFF1A7BCF), // 연갈색 배경
         elevation = 0.dp
     ) {
         Box(
@@ -51,7 +51,7 @@ fun TopBar(onMenuClick: () -> Unit) {
             Text(
                 text = "RecordWithMe",
                 fontSize = 20.sp,
-                color = Color(0xFF000000), // 진한 갈색 텍스트
+                color = Color(0xFFFFFFFF), // 진한 갈색 텍스트
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.align(Alignment.Center)
             )
@@ -61,7 +61,7 @@ fun TopBar(onMenuClick: () -> Unit) {
                 onClick = onMenuClick,
                 modifier = Modifier.align(Alignment.CenterEnd)
             ) {
-                Icon(Icons.Default.Menu, contentDescription = "메뉴", tint = Color(0xFF6D4C41)) // 진한 갈색 아이콘
+                Icon(Icons.Default.Menu, contentDescription = "메뉴", tint = Color(0xFFFFFFFF)) // 진한 갈색 아이콘
             }
         }
     }

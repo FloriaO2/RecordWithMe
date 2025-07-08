@@ -23,15 +23,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -68,8 +67,8 @@ fun LoginScreen(
                 painter = painterResource(id = R.drawable.logo),
                 contentDescription = "앱 로고",
                 modifier = Modifier
-                    .height(250.dp)
-                    .padding(bottom = 10.dp)
+                    .height(240.dp)
+                    .padding(bottom = 20.dp, top = 80.dp)
             )
             Text(
                 "RecordWithMe",
@@ -78,7 +77,7 @@ fun LoginScreen(
                 fontSize = 30.sp
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(50.dp))
 
             OutlinedTextField(
                 value = id,
@@ -167,7 +166,7 @@ fun LoginScreen(
                         }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFFFC0CB)),
+                colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xC6000000)),
                 shape = RoundedCornerShape(20.dp)
             ) {
                 Text("기존 계정으로 로그인", fontWeight = FontWeight.Bold, color = Color.White)

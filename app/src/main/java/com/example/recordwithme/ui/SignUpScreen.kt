@@ -242,8 +242,7 @@ fun SignUpScreen(navController: NavController) {
                                                     "name" to name,
                                                     "id" to id,
                                                     "email" to fakeEmail,
-                                                    "uid" to id,
-                                                    "loginType" to "email"
+                                                    "uid" to (user?.uid ?: id),
                                                 )
                                                 
                                                 // 사용자 문서 ID를 id값으로 설정
@@ -293,8 +292,7 @@ fun SignUpScreen(navController: NavController) {
                                                 "name" to name,
                                                 "id" to id,
                                                 "email" to fakeEmail,
-                                                "uid" to id,
-                                                "loginType" to "email"
+                                                "uid" to (user?.uid ?: id),
                                             )
                                             
                                             // 사용자 문서 ID를 id값으로 설정

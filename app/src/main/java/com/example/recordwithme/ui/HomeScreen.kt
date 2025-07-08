@@ -345,13 +345,13 @@ fun HomeScreen() {
                         ) {
                             Card(
                                 modifier = Modifier.fillMaxSize(),
-                                shape = RoundedCornerShape(0.dp),
+                                shape= RoundedCornerShape(0.dp),
                                 colors = CardDefaults.cardColors(containerColor = Color.White)
                             ) {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .background(Color(0x57BE09E7)),
+                                        .background(Color(0xD02196F3)), //대표사진 배경컬러
                                     contentAlignment = Alignment.Center
                                 ) {
                                     if (representativePhoto != null) {
@@ -435,7 +435,7 @@ fun HomeScreen() {
                         permissionLauncher.launch(Manifest.permission.READ_MEDIA_IMAGES)
                     }
                 },
-                containerColor = Color(0xFF6D4C41),
+                containerColor = Color(0xFF000000),
                 contentColor = Color.White,
                 elevation = FloatingActionButtonDefaults.elevation(8.dp),
                 modifier = Modifier.align(Alignment.BottomEnd).padding(24.dp).size(64.dp)
@@ -453,7 +453,7 @@ fun HomeScreen() {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.7f))
+                    .background(Color.White.copy(alpha = 0.8f))
                     .clickable { selectedPhotoUrl = null }
             ) {
                 // 메인 이미지
@@ -470,7 +470,7 @@ fun HomeScreen() {
                             Modifier
                                 .fillMaxWidth()
                                 .aspectRatio(1f)
-                                .background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
+                                .background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(0.dp))
                                 .padding(8.dp),
                             contentScale = ContentScale.Fit
                         )
@@ -481,7 +481,7 @@ fun HomeScreen() {
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .aspectRatio(1f)
-                                .background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
+                                .background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(0.dp))
                                 .padding(8.dp),
                             contentScale = ContentScale.Fit
                         )
@@ -501,7 +501,7 @@ fun HomeScreen() {
                             saveImageToGallery(context, selectedPhotoUrl!!, currentPhoto?.isBase64 ?: false)
                         },
                         modifier = Modifier
-                            .background(Color.White.copy(alpha = 0.2f), CircleShape)
+                            .background(Color.Black.copy(alpha = 0.8f), CircleShape)
                             .size(48.dp)
                     ) {
                         Icon(
@@ -518,7 +518,7 @@ fun HomeScreen() {
                     IconButton(
                         onClick = { selectedPhotoUrl = null },
                         modifier = Modifier
-                            .background(Color.White.copy(alpha = 0.2f), CircleShape)
+                            .background(Color.Black.copy(alpha = 0.8f), CircleShape)
                             .size(48.dp)
                     ) {
                         Icon(
@@ -545,7 +545,7 @@ fun HomeScreen() {
                         Icon(
                             Icons.Filled.KeyboardArrowLeft,
                             contentDescription = "이전 사진",
-                            tint = Color.White,
+                            tint = Color.Black,
                             modifier = Modifier.size(48.dp)
                         )
                     }
@@ -566,7 +566,7 @@ fun HomeScreen() {
                         Icon(
                             Icons.Filled.KeyboardArrowRight,
                             contentDescription = "다음 사진",
-                            tint = Color.White,
+                            tint = Color.Black,
                             modifier = Modifier.size(48.dp)
                         )
                     }

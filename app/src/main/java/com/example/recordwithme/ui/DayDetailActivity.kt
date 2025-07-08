@@ -86,7 +86,8 @@ class PhotoAdapter(
         val commentButton: Button,
         val deleteButton: Button,
         val labelButton: Button,
-        val musicOverlay: RelativeLayout,
+        val musicOverlay: LinearLayout,
+        val musicText: TextView,
         val playButton: ImageButton,
         itemView: View
     ) : RecyclerView.ViewHolder(itemView)
@@ -153,42 +154,37 @@ class PhotoAdapter(
                 }
                 
                 // 음악 정보 오버레이 (처음에는 숨김)
-                val musicOverlay = RelativeLayout(context).apply {
-                    layoutParams = FrameLayout.LayoutParams(
+                val musicText = TextView(context).apply {
+                    text = "🎵 이 순간과 어울리는 음악은 무엇일까요?"
+                    setTextColor(Color.WHITE)
+                    textSize = 16f
+                    setTypeface(null, android.graphics.Typeface.BOLD)
+                    setPadding(0, 0, 16, 0)
+                    layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 0.85f)
+                    maxLines = 1
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                    setShadowLayer(4f, 0f, 0f, Color.BLACK)
+                    maxWidth = (180 * context.resources.displayMetrics.density).toInt() // 180dp 제한
+                }
+                val playButton = ImageButton(context).apply {
+                    setImageResource(android.R.drawable.ic_media_play)
+                    setBackgroundColor(Color.TRANSPARENT)
+                    setColorFilter(Color.BLACK)
+                    layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 0.15f)
+                    visibility = View.GONE // 처음엔 안 보이게
+                }
+                val musicOverlay = LinearLayout(context).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    setBackgroundColor(Color.TRANSPARENT)
+                    gravity = Gravity.CENTER_VERTICAL
+                    layoutParams = LinearLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.WRAP_CONTENT
                     )
-                    setBackgroundColor(Color.parseColor("#80000000")) // 반투명 검정
-                    visibility = View.GONE
-                    
-                    val musicText = TextView(context).apply {
-                        text = "🎵 음악을 찾는 중..."
-                        setTextColor(Color.WHITE)
-                        textSize = 16f
-                        setPadding(16, 12, 16, 12)
-                        layoutParams = RelativeLayout.LayoutParams(
-                            ViewGroup.LayoutParams.WRAP_CONTENT,
-                            ViewGroup.LayoutParams.WRAP_CONTENT
-                        ).apply {
-                            addRule(RelativeLayout.CENTER_IN_PARENT)
-                        }
-                    }
+                    setPadding(24, 16, 24, 16)
+                    weightSum = 1f
+                    visibility = View.VISIBLE // 항상 보이게
                     addView(musicText)
-                    
-                    // 재생/정지 버튼
-                    val playButton = ImageButton(context).apply {
-                        setImageResource(android.R.drawable.ic_media_play)
-                        setBackgroundColor(Color.TRANSPARENT)
-                        setColorFilter(Color.WHITE)
-                        layoutParams = RelativeLayout.LayoutParams(
-                            ViewGroup.LayoutParams.WRAP_CONTENT,
-                            ViewGroup.LayoutParams.WRAP_CONTENT
-                        ).apply {
-                            addRule(RelativeLayout.ALIGN_PARENT_RIGHT)
-                            addRule(RelativeLayout.CENTER_VERTICAL)
-                            rightMargin = 16
-                        }
-                    }
                     addView(playButton)
                 }
                 
@@ -224,6 +220,12 @@ class PhotoAdapter(
                     setBackgroundColor(Color.BLACK)
                     setTextColor(Color.WHITE)
                 }
+                val buttonSpacer = View(context).apply {
+                    layoutParams = LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        12 // 등록-삭제 버튼과 동일하게 12px 높이로 변경
+                    )
+                }
                 val labelButton = Button(context).apply {
                     text = "어울리는 음악 재생"
                     textSize = 13f
@@ -237,18 +239,19 @@ class PhotoAdapter(
                 deleteParams.topMargin = 12
                 deleteButton.layoutParams = deleteParams
                 innerContainer.addView(imageView)
+                innerContainer.addView(musicOverlay)
                 innerContainer.addView(descView)
                 innerContainer.addView(divider)
                 innerContainer.addView(commentsView)
                 innerContainer.addView(commentInput)
                 innerContainer.addView(commentButton)
                 innerContainer.addView(deleteButton)
+                innerContainer.addView(buttonSpacer)
                 innerContainer.addView(labelButton)
                 
                 container.addView(innerContainer)
-                container.addView(musicOverlay)
                 
-                PhotoViewHolder(imageView, descView, commentsView, commentInput, commentButton, deleteButton, labelButton, musicOverlay, musicOverlay.getChildAt(1) as ImageButton, container)
+                PhotoViewHolder(imageView, descView, commentsView, commentInput, commentButton, deleteButton, labelButton, musicOverlay, musicText, playButton, container)
             }
         }
     }
@@ -266,6 +269,9 @@ class PhotoAdapter(
                 val photoIdx = position - 2
                 val photo = photos[photoIdx]
                 val photoHolder = holder as PhotoViewHolder
+                // 항상 초기화
+                photoHolder.musicText.text = "🎵 이 순간과 어울리는 음악은 무엇일까요?"
+                photoHolder.playButton.visibility = View.GONE
                 // 이하 기존 PhotoAdapter의 onBindViewHolder 내용에서 position -> photoIdx로 변경
                 if (photo.isBase64) {
                     try {
@@ -351,8 +357,7 @@ class PhotoAdapter(
                 }
                 val context = photoHolder.itemView.context
                 val photoId = photoDocIds[photoIdx]
-                (photoHolder.itemView as ViewGroup).findViewWithTag<Button>("deleteButton")?.setOnClickListener(null)
-                (photoHolder.itemView as ViewGroup).getChildAt((photoHolder.itemView as ViewGroup).childCount - 1).setOnClickListener {
+                photoHolder.deleteButton.setOnClickListener {
                     AlertDialog.Builder(context)
                         .setTitle("사진 삭제")
                         .setMessage("정말 삭제하시겠습니까?")
@@ -372,24 +377,16 @@ class PhotoAdapter(
                 photoHolder.labelButton.setOnClickListener {
                     CoroutineScope(Dispatchers.IO).launch {
                         try {
-                            // 음악 오버레이 표시
                             (photoHolder.itemView.context as? android.app.Activity)?.runOnUiThread {
                                 photoHolder.musicOverlay.visibility = View.VISIBLE
-                                val musicText = photoHolder.musicOverlay.getChildAt(0) as TextView
-                                musicText.text = "🎵 음악을 찾는 중..."
                             }
-                            
-                            // 1. Vision API로 라벨 추출
-                            // TODO: .env에서 Vision API 키를 불러오도록 변경
                             val visionApiKey = BuildConfig.VISION_API_KEY
                             val labels = com.example.recordwithme.util.VisionApiHelper.getLabelsFromVisionApi(
                                 photo.url, // Base64 데이터
                                 visionApiKey
                             )
                             Log.d("SpotifyDebug", "Vision 라벨: $labels")
-                            
                             if (labels.isNotEmpty()) {
-                                // 2. 저장된 Spotify Access Token 가져오기
                                 val masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
                                 val prefs = EncryptedSharedPreferences.create(
                                     "spotify_prefs",
@@ -399,28 +396,69 @@ class PhotoAdapter(
                                     EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
                                 )
                                 val accessToken = prefs.getString("access_token", null)
-                                
                                 if (accessToken != null) {
-                                    // 3. Spotify API로 음악 검색
-                                    val searchQuery = labels.take(3).joinToString(" ") // 상위 3개 라벨로 검색
+                                    val musicKeywords = listOf("k-pop", "Korean", "노래", "music")
+                                    val searchQuery = (labels.take(3) + musicKeywords).joinToString(" ")
                                     val tracks = searchSpotifyTracks(searchQuery, accessToken)
                                     Log.d("SpotifyDebug", "검색 쿼리: $searchQuery, 트랙 수: ${tracks.size}")
                                     if (tracks.isNotEmpty()) {
-                                        Log.d("SpotifyDebug", "첫 곡: ${tracks[0].name}, previewUrl: ${tracks[0].previewUrl}")
-                                        // 4. 첫 번째 트랙 정보를 오버레이에 표시
-                                        val firstTrack = tracks[0]
-                                        (photoHolder.itemView.context as? android.app.Activity)?.runOnUiThread {
-                                            val musicText = photoHolder.musicOverlay.getChildAt(0) as TextView
-                                            musicText.text = "🎵 ${firstTrack.name} - ${firstTrack.artist}"
-                                            
-                                            // 재생 버튼 클릭 시 Preview URL 재생
-                                            val playButton = photoHolder.musicOverlay.getChildAt(1) as ImageButton
-                                            playButton.setOnClickListener {
-                                                playPreviewUrl(firstTrack.previewUrl, photoHolder, photoIdx)
+                                        val playableTrack = tracks.firstOrNull { it.previewUrl != null }
+                                        if (playableTrack != null) {
+                                            Log.d("SpotifyDebug", "첫 미리듣기 곡: ${playableTrack.name}, previewUrl: ${playableTrack.previewUrl}")
+                                            (photoHolder.itemView.context as? android.app.Activity)?.runOnUiThread {
+                                                val musicText = photoHolder.musicText
+                                                musicText.text = "🎵 ${playableTrack.name} - ${playableTrack.artist}"
+                                                val playButton = photoHolder.playButton
+                                                playButton.setImageResource(android.R.drawable.ic_media_pause)
+                                                playButton.visibility = View.VISIBLE
+                                                playButton.setOnClickListener {
+                                                    togglePlayPause(playableTrack.previewUrl, photoHolder, photoIdx)
+                                                }
+                                                photoHolder.itemView.tag = playableTrack
+                                                // 자동 재생
+                                                playPreviewUrl(playableTrack.previewUrl, photoHolder, photoIdx, autoPlay = true)
                                             }
-                                            
-                                            // Track 정보를 ViewHolder에 저장 (나중에 사용하기 위해)
-                                            photoHolder.itemView.tag = firstTrack
+                                        } else {
+                                            // iTunes에서 미리듣기 URL 시도
+                                            val mostPopularTrack = tracks.maxByOrNull { it.popularity }
+                                            if (mostPopularTrack != null) {
+                                                Log.d("SpotifyDebug", "iTunes 검색용 곡 정보(인기순): name=${mostPopularTrack.name}, artist=${mostPopularTrack.artist}, popularity=${mostPopularTrack.popularity}")
+                                                val itunesPreviewUrl = getItunesPreviewUrl(mostPopularTrack.name, mostPopularTrack.artist)
+                                                if (itunesPreviewUrl != null) {
+                                                    Log.d("SpotifyDebug", "iTunes 미리듣기 URL: $itunesPreviewUrl")
+                                                    (photoHolder.itemView.context as? android.app.Activity)?.runOnUiThread {
+                                                        val musicText = photoHolder.musicText
+                                                        musicText.text = "🎵 ${mostPopularTrack.name} - ${mostPopularTrack.artist} (iTunes)"
+                                                        val playButton = photoHolder.playButton
+                                                        playButton.setImageResource(android.R.drawable.ic_media_pause)
+                                                        playButton.visibility = View.VISIBLE
+                                                        playButton.setOnClickListener {
+                                                            togglePlayPause(itunesPreviewUrl, photoHolder, photoIdx)
+                                                        }
+                                                        photoHolder.itemView.tag = mostPopularTrack
+                                                        // 자동 재생
+                                                        playPreviewUrl(itunesPreviewUrl, photoHolder, photoIdx, autoPlay = true)
+                                                    }
+                                                } else {
+                                                    (photoHolder.itemView.context as? android.app.Activity)?.runOnUiThread {
+                                                        photoHolder.musicOverlay.visibility = View.GONE
+                                                        android.widget.Toast.makeText(
+                                                            photoHolder.itemView.context,
+                                                            "미리듣기 가능한 곡이 없습니다.",
+                                                            android.widget.Toast.LENGTH_LONG
+                                                        ).show()
+                                                    }
+                                                }
+                                            } else {
+                                                (photoHolder.itemView.context as? android.app.Activity)?.runOnUiThread {
+                                                    photoHolder.musicOverlay.visibility = View.GONE
+                                                    android.widget.Toast.makeText(
+                                                        photoHolder.itemView.context,
+                                                        "미리듣기 가능한 곡이 없습니다.",
+                                                        android.widget.Toast.LENGTH_LONG
+                                                    ).show()
+                                                }
+                                            }
                                         }
                                     } else {
                                         (photoHolder.itemView.context as? android.app.Activity)?.runOnUiThread {
@@ -471,8 +509,8 @@ class PhotoAdapter(
     override fun getItemCount(): Int = 2 + photos.size
 
     // Preview URL 재생 함수
-    private fun playPreviewUrl(previewUrl: String?, photoHolder: PhotoViewHolder, photoIdx: Int) {
-        Log.d("SpotifyDebug", "playPreviewUrl 진입, previewUrl: $previewUrl")
+    private fun playPreviewUrl(previewUrl: String?, photoHolder: PhotoViewHolder, photoIdx: Int, autoPlay: Boolean = false) {
+        Log.d("SpotifyDebug", "playPreviewUrl 진입, previewUrl: $previewUrl, autoPlay: $autoPlay")
         if (previewUrl == null) {
             // Preview URL이 없으면 Spotify 앱으로 이동
             val track = photoHolder.itemView.tag as? Track
@@ -511,22 +549,16 @@ class PhotoAdapter(
                 prepareAsync()
                 setOnPreparedListener { player ->
                     Log.d("SpotifyDebug", "MediaPlayer 준비 완료, 재생 시작")
-                    player.start()
-                    currentPlayingPosition = photoIdx
-                    
-                    // 재생 버튼을 정지 버튼으로 변경
-                    val playButton = photoHolder.musicOverlay.getChildAt(1) as ImageButton
-                    playButton.setImageResource(android.R.drawable.ic_media_pause)
-                    
-                    android.widget.Toast.makeText(
-                        photoHolder.itemView.context,
-                        "🎵 30초 미리듣기 재생 중...",
-                        android.widget.Toast.LENGTH_SHORT
-                    ).show()
+                    if (autoPlay) {
+                        player.start()
+                        currentPlayingPosition = photoIdx
+                        val playButton = photoHolder.playButton
+                        playButton.setImageResource(android.R.drawable.ic_media_pause)
+                    }
                 }
                 setOnCompletionListener { player ->
                     // 재생 완료 시 재생 버튼으로 변경
-                    val playButton = photoHolder.musicOverlay.getChildAt(1) as ImageButton
+                    val playButton = photoHolder.playButton
                     playButton.setImageResource(android.R.drawable.ic_media_play)
                     currentPlayingPosition = -1
                 }
@@ -537,7 +569,7 @@ class PhotoAdapter(
                         "재생 중 오류가 발생했습니다. (코드: $what, $extra)",
                         android.widget.Toast.LENGTH_SHORT
                     ).show()
-                    val playButton = photoHolder.musicOverlay.getChildAt(1) as ImageButton
+                    val playButton = photoHolder.playButton
                     playButton.setImageResource(android.R.drawable.ic_media_play)
                     currentPlayingPosition = -1
                     true
@@ -570,6 +602,22 @@ class PhotoAdapter(
     // Adapter 소멸 시 MediaPlayer 정리
     fun cleanup() {
         stopCurrentMusic()
+    }
+
+    // 일시정지/이어듣기 토글 함수 (반드시 클래스 내부에 위치)
+    private fun togglePlayPause(previewUrl: String?, photoHolder: PhotoViewHolder, photoIdx: Int) {
+        if (currentMediaPlayer != null && currentMediaPlayer!!.isPlaying) {
+            currentMediaPlayer?.pause()
+            val playButton = photoHolder.playButton
+            playButton.setImageResource(android.R.drawable.ic_media_play)
+        } else if (currentMediaPlayer != null && !currentMediaPlayer!!.isPlaying) {
+            currentMediaPlayer?.start()
+            val playButton = photoHolder.playButton
+            playButton.setImageResource(android.R.drawable.ic_media_pause)
+        } else {
+            // 처음 재생
+            playPreviewUrl(previewUrl, photoHolder, photoIdx, autoPlay = true)
+        }
     }
 }
 
@@ -815,7 +863,8 @@ data class Track(
     val name: String,
     val artist: String,
     val album: String,
-    val previewUrl: String?
+    val previewUrl: String?,
+    val popularity: Int = 0
 )
 
 // Spotify API로 음악 검색하는 함수 (한국 음악 우선, 유명한 곡들)
@@ -861,8 +910,9 @@ private fun searchSpotifyTracks(query: String, accessToken: String): List<Track>
                 
                 val albumObject = trackObject.getJSONObject("album")
                 val album = albumObject.getString("name")
+                val popularity = trackObject.optInt("popularity", 0)
                 
-                tracks.add(Track(id, name, artist, album, previewUrl))
+                tracks.add(Track(id, name, artist, album, previewUrl, popularity))
             }
             
             // 인기도 순으로 정렬 (유명한 곡 우선)
@@ -875,7 +925,7 @@ private fun searchSpotifyTracks(query: String, accessToken: String): List<Track>
                 popularKeywords.count { keyword ->
                     track.name.contains(keyword, ignoreCase = true) || 
                     track.artist.contains(keyword, ignoreCase = true)
-                }
+                } + track.popularity
             }
         } else {
             emptyList()
@@ -883,5 +933,30 @@ private fun searchSpotifyTracks(query: String, accessToken: String): List<Track>
     } catch (e: Exception) {
         e.printStackTrace()
         emptyList()
+    }
+}
+
+// iTunes Search API로 미리듣기 URL을 받아오는 함수
+private fun getItunesPreviewUrl(trackName: String, artist: String): String? {
+    return try {
+        val query = java.net.URLEncoder.encode("$trackName $artist", "UTF-8")
+        val url = URL("https://itunes.apple.com/search?term=$query&entity=song&limit=1")
+        val connection = url.openConnection() as HttpURLConnection
+        connection.requestMethod = "GET"
+        connection.connectTimeout = 5000
+        connection.readTimeout = 5000
+        val responseCode = connection.responseCode
+        if (responseCode == HttpURLConnection.HTTP_OK) {
+            val response = connection.inputStream.bufferedReader().use { it.readText() }
+            val json = JSONObject(response)
+            val results = json.getJSONArray("results")
+            if (results.length() > 0) {
+                val first = results.getJSONObject(0)
+                return first.getString("previewUrl")
+            }
+        }
+        null
+    } catch (e: Exception) {
+        null
     }
 }

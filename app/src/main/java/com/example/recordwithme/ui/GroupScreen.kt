@@ -123,7 +123,13 @@ fun GroupScreen(navController: NavController) {
                 .get()
                 .await()
             friends.clear()
-            friends.addAll(friendsSnapshot.documents.map { it.id })
+            // friends 서브컬렉션의 id(=친구uid)로 users/{id}에서 name을 가져옴
+            for (doc in friendsSnapshot.documents) {
+                val id = doc.id
+                val friendUserDoc = firestore.collection("users").document(id).get().await()
+                val name = friendUserDoc.getString("name") ?: id
+                friends.add(name)
+            }
             
             // 본인 그룹 목록만 가져오기
             val userGroupsSnapshot = firestore.collection("users")
@@ -678,11 +684,35 @@ fun GroupDetailPanel(
         if (currentUserId == null) return
         FirebaseFirestore.getInstance().collection("users").document(currentUserId).collection("friends").get()
             .addOnSuccessListener { snapshot ->
-                val allFriends = snapshot.documents.map { it.id to (it.getString("name") ?: it.id) }
-                // 그룹에 없는 친구만 필터링
-                val notInGroup = allFriends.filter { (id, _) -> id !in group.members }
-                friends = notInGroup
-                loadingFriends = false
+                val friendIds = snapshot.documents.map { it.id }
+                val notInGroupIds = friendIds.filter { it !in group.members }
+                val friendList = mutableListOf<Pair<String, String>>() // (uid, name)
+                if (notInGroupIds.isEmpty()) {
+                    friends = emptyList()
+                    loadingFriends = false
+                    return@addOnSuccessListener
+                }
+                var loadedCount = 0
+                notInGroupIds.forEach { uid ->
+                    FirebaseFirestore.getInstance().collection("users").document(uid).get()
+                        .addOnSuccessListener { userDoc ->
+                            val name = userDoc.getString("name") ?: userDoc.getString("email") ?: uid
+                            friendList.add(uid to name)
+                            loadedCount++
+                            if (loadedCount == notInGroupIds.size) {
+                                friends = friendList
+                                loadingFriends = false
+                            }
+                        }
+                        .addOnFailureListener {
+                            friendList.add(uid to uid)
+                            loadedCount++
+                            if (loadedCount == notInGroupIds.size) {
+                                friends = friendList
+                                loadingFriends = false
+                            }
+                        }
+                }
             }
             .addOnFailureListener {
                 friends = emptyList()
@@ -856,8 +886,10 @@ fun GroupDetailPanel(
                 } else if (friends.isEmpty()) {
                     Text("추가할 수 있는 친구가 없습니다.")
                 } else {
-                    Column {
-                        friends.forEach { (id, name) ->
+                    LazyColumn(
+                        modifier = Modifier.height(300.dp)
+                    ) {
+                        items(friends) { (id, name) ->
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Checkbox(
                                     checked = selectedFriends.contains(id),

@@ -1024,18 +1024,24 @@ private fun searchSpotifyTracks(query: String, accessToken: String, labels: List
                 tracks.add(Track(id, name, artist, album, previewUrl, popularity))
             }
 
+            // 임영웅(영문/한글) 아티스트의 곡 제외
+            val filteredTracks = tracks.filterNot {
+                it.artist.contains("Lim Young Woong", ignoreCase = true) ||
+                it.artist.contains("임영웅")
+            }
+
             // 라벨 가중치 1.5배 적용
-            tracks.sortedByDescending { track ->
+            filteredTracks.sortedByDescending { track ->
                 val popularKeywords = listOf("방탄소년단", "BTS", "블랙핑크", "BLACKPINK", "아이유", "IU",
                     "세븐틴", "SEVENTEEN", "트와이스", "TWICE", "레드벨벳", "Red Velvet", "엑소", "EXO",
                     "뉴진스", "NewJeans", "르세라핌", "LE SSERAFIM", "아이브", "IVE", "스테이씨", "STAYC")
                 val labelScore = labels.count { label ->
                     track.name.contains(label, ignoreCase = true) ||
-                            track.artist.contains(label, ignoreCase = true)
+                    track.artist.contains(label, ignoreCase = true)
                 }
                 val keywordScore = popularKeywords.count { keyword ->
                     track.name.contains(keyword, ignoreCase = true) ||
-                            track.artist.contains(keyword, ignoreCase = true)
+                    track.artist.contains(keyword, ignoreCase = true)
                 }
                 (labelScore * 1.5) + keywordScore + track.popularity
             }

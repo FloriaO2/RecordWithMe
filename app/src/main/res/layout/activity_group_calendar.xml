@@ -2,32 +2,62 @@
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:layout_marginTop="0dp"
     android:background="#FFFFFF">
 
-    <!-- 큰 월 숫자 -->
-    <TextView
-        android:id="@+id/textMonth"
-        android:layout_width="wrap_content"
+    <androidx.compose.ui.platform.ComposeView
+        android:id="@+id/composeTopBar"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="3"
-        android:textSize="120sp"
-        android:textStyle="bold"
-        android:layout_alignParentStart="true"
-        android:layout_marginTop="24dp"
-        android:layout_marginStart="24dp"
-        android:textColor="#000000"/>
+        android:layout_alignParentTop="true"/>
 
-    <!-- 연/월 변경 버튼 + 연/월 표시 (상단 오른쪽) -->
+    <!-- 월/연월 표시를 1:1로 나누는 행 -->
     <LinearLayout
-        android:id="@+id/layoutYearMonth"
-        android:layout_width="wrap_content"
+        android:id="@+id/monthRow"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:layout_alignParentEnd="true"
-        android:layout_alignParentTop="true"
-        android:layout_marginTop="32dp"
-        android:layout_marginEnd="32dp"/>
+        android:layout_marginTop="100dp"
+        >
+
+        <TextView
+            android:id="@+id/textMonth"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="7"
+            android:minWidth="0dp"
+            android:text="3"
+            android:textSize="120sp"
+            android:textStyle="bold"
+            android:gravity="start|center_vertical"
+            android:layout_marginStart="24dp"
+            android:textColor="#000000"/>
+
+        <LinearLayout
+            android:id="@+id/layoutYearMonth"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="13"
+            android:orientation="horizontal"
+            android:gravity="end|center_vertical"
+            android:layout_marginEnd="20dp"
+            android:layout_marginTop="40dp"/>
+    </LinearLayout>
+
+    <!-- 그룹 관리 창으로 돌아가기 버튼 복원 -->
+    <Button
+        android:id="@+id/btnBackToGroup"
+        android:layout_width="140dp"
+        android:layout_height="35dp"
+        android:text="그룹 관리 창으로 돌아가기"
+        android:textSize="10sp"
+        android:background="@drawable/btn_rounded_rect_navy"
+        android:paddingLeft="5dp"
+        android:paddingRight="5dp"
+        android:layout_below="@id/monthRow"
+        android:layout_marginTop="-60dp"
+        android:layout_marginStart="180dp"
+        android:layout_marginEnd="30dp"/>
 
     <!-- 요일 헤더 -->
     <LinearLayout
@@ -35,11 +65,12 @@
         android:orientation="horizontal"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_below="@id/textMonth"
-        android:layout_marginTop="32dp"
+        android:layout_below="@id/monthRow"
+        android:layout_marginTop="20dp"
         android:layout_marginStart="24dp"
         android:layout_marginEnd="24dp"
         android:gravity="center">
+        <!--원래는 marginTop 32dp-->
 
         <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="MON" android:gravity="center" android:textColor="#888888"/>
         <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="TUE" android:gravity="center" android:textColor="#888888"/>
@@ -64,16 +95,4 @@
         android:columnCount="7"
         android:rowCount="6" />
 
-    <Button
-        android:id="@+id/btnBack"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignParentStart="true"
-        android:layout_alignParentTop="true"
-        android:layout_marginStart="-13dp"
-        android:layout_marginTop="0dp"
-        android:background="@android:color/transparent"
-        android:text="◀"
-        android:textColor="#000000"
-        android:textSize="20sp" />
 </RelativeLayout> 

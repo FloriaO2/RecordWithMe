@@ -13,6 +13,7 @@ import androidx.compose.material.IconButton
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -25,8 +26,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.recordwithme.R
 
+enum class TopBarIconType { Menu, Home }
+
 @Composable
-fun TopBar(onMenuClick: () -> Unit) {
+fun TopBar(onMenuClick: () -> Unit, iconType: TopBarIconType = TopBarIconType.Menu) {
     Surface(
         color = Color.White, // 배경 투명
         elevation = 0.dp
@@ -111,14 +114,18 @@ fun TopBar(onMenuClick: () -> Unit) {
                     .padding(bottom = 16.dp)
             )
 
-            // 오른쪽: 메뉴 버튼
+            // 오른쪽: 메뉴/홈 버튼
             IconButton(
                 onClick = onMenuClick,
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .padding(bottom = 16.dp)
             ) {
-                Icon(Icons.Default.Menu, contentDescription = "메뉴", tint = Color(0xFFFFFFFF), modifier = Modifier.size(30.dp)) // 진한 갈색 아이콘
+                if (iconType == TopBarIconType.Home) {
+                    Icon(Icons.Default.Home, contentDescription = "홈", tint = Color(0xFFFFFFFF), modifier = Modifier.size(30.dp))
+                } else {
+                    Icon(Icons.Default.Menu, contentDescription = "메뉴", tint = Color(0xFFFFFFFF), modifier = Modifier.size(30.dp))
+                }
             }
         }
     }

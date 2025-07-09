@@ -35,6 +35,18 @@ import android.view.MotionEvent
 import android.view.View
 import kotlin.math.abs
 import android.util.Log
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.zIndex
+import androidx.compose.ui.window.Dialog
+import com.example.recordwithme.MainActivity
+import com.example.recordwithme.ui.TopBarIconType
 
 class GroupCalendarActivity : AppCompatActivity() {
     private var year = 2024 
@@ -49,14 +61,53 @@ class GroupCalendarActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_group_calendar)
 
+        // 시스템 UI(상단바, 하단바) 숨기기
+        window.decorView.systemUiVisibility =
+            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
+            View.SYSTEM_UI_FLAG_FULLSCREEN or
+            View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+
+        // TopBar ComposeView에 세팅
+        val composeTopBar = findViewById<ComposeView>(R.id.composeTopBar)
+        composeTopBar.setContent {
+            TopBar(
+                iconType = TopBarIconType.Home,
+                onMenuClick = {
+                    val intent = Intent(this@GroupCalendarActivity, MainActivity::class.java)
+                    intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                    startActivity(intent)
+                    finish()
+                }
+            )
+        }
+
         // Intent에서 그룹 정보 가져오기
         groupId = intent.getStringExtra("groupId") ?: ""
         groupName = intent.getStringExtra("groupName") ?: ""
+        
+        // 디버깅을 위한 로그
+        Log.d("GroupCalendarActivity", "받은 groupId: $groupId")
+        Log.d("GroupCalendarActivity", "받은 groupName: $groupName")
 
         val textMonth = findViewById<TextView>(R.id.textMonth)
         val layoutYearMonth = findViewById<LinearLayout>(R.id.layoutYearMonth)
+        // 월에 따라 marginEnd 동적 조정
+        val params = layoutYearMonth.layoutParams as ViewGroup.MarginLayoutParams
+        if (month >= 10) {
+            params.marginEnd = (8 * resources.displayMetrics.density).toInt() // 8dp
+        } else {
+            params.marginEnd = (0 * resources.displayMetrics.density).toInt() // 20dp
+        }
+        layoutYearMonth.layoutParams = params
         val layoutWeekdays = findViewById<LinearLayout>(R.id.layoutWeekdays)
         grid = findViewById<GridLayout>(R.id.gridCalendar)
+
+        // 월이 두 자리수면 letterSpacing을 더 좁게, 한 자리수면 기본값
+        if (month >= 10) {
+            textMonth.letterSpacing = -0.08f
+        } else {
+            textMonth.letterSpacing = 0f
+        }
 
         // 제스처 디텍터 초기화
         gestureDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
@@ -100,12 +151,11 @@ class GroupCalendarActivity : AppCompatActivity() {
         layoutYearMonth.orientation = LinearLayout.HORIZONTAL
         layoutYearMonth.gravity = Gravity.CENTER_VERTICAL
 
-        val tvPrev = TextView(this).apply {
-            text = "◀"
-            textSize = 28f
-            setTextColor(Color.BLACK)
-            setPadding(16, 0, 16, 0)
-            gravity = Gravity.CENTER
+        // Material 아이콘으로 월 이동 버튼 생성
+        val ivPrev = ImageView(this).apply {
+            setImageResource(com.google.android.material.R.drawable.material_ic_keyboard_arrow_left_black_24dp)
+            setPadding(24, 24, 24, 24)
+            setOnClickListener { goToPreviousMonth() }
         }
         val tvYearMonth = TextView(this).apply {
             textSize = 32f
@@ -113,27 +163,18 @@ class GroupCalendarActivity : AppCompatActivity() {
             gravity = Gravity.CENTER
             setPadding(8, 0, 8, 0)
         }
-        val tvNext = TextView(this).apply {
-            text = "▶"
-            textSize = 28f
-            setTextColor(Color.BLACK)
-            setPadding(16, 0, 16, 0)
-            gravity = Gravity.CENTER
+        val ivNext = ImageView(this).apply {
+            setImageResource(com.google.android.material.R.drawable.material_ic_keyboard_arrow_right_black_24dp)
+            setPadding(24, 24, 24, 24)
+            setOnClickListener { goToNextMonth() }
         }
-        layoutYearMonth.addView(tvPrev)
+        // yearMonthControls 관련 코드 삭제, layoutYearMonth에 addView 복원
+        layoutYearMonth.addView(ivPrev)
         layoutYearMonth.addView(tvYearMonth)
-        layoutYearMonth.addView(tvNext)
+        layoutYearMonth.addView(ivNext)
 
-        // 이전/다음 버튼 동작
-        tvPrev.setOnClickListener {
-            goToPreviousMonth()
-        }
-        tvNext.setOnClickListener {
-            goToNextMonth()
-        }
-        
         // 뒤로가기 버튼 클릭 리스너 연결
-        findViewById<Button>(R.id.btnBack).setOnClickListener {
+        findViewById<Button>(R.id.btnBackToGroup).setOnClickListener {
             onBackPressedDispatcher.onBackPressed()
         }
 
@@ -185,11 +226,20 @@ class GroupCalendarActivity : AppCompatActivity() {
     private fun animateCalendarTransition() {
         val textMonth = findViewById<TextView>(R.id.textMonth)
         val layoutYearMonth = findViewById<LinearLayout>(R.id.layoutYearMonth)
+        // 월에 따라 marginEnd 동적 조정
+        val params = layoutYearMonth.layoutParams as ViewGroup.MarginLayoutParams
+        if (month >= 10) {
+            params.marginEnd = (8 * resources.displayMetrics.density).toInt() // 8dp
+        } else {
+            params.marginEnd = (20 * resources.displayMetrics.density).toInt() // 20dp
+        }
+        layoutYearMonth.layoutParams = params
         val layoutWeekdays = findViewById<LinearLayout>(R.id.layoutWeekdays)
-        
-        // 뒤로가기 버튼을 제외한 모든 UI 요소에 애니메이션 적용
-        val uiElements = listOf(textMonth, layoutYearMonth, layoutWeekdays, grid)
-        
+        val grid = findViewById<GridLayout>(R.id.gridCalendar)
+        val btnBackToGroup = findViewById<Button>(R.id.btnBackToGroup)
+
+        val uiElements = listOf(textMonth, layoutYearMonth, layoutWeekdays, grid, btnBackToGroup)
+
         // 현재 UI 요소들에 페이드 아웃 애니메이션 적용
         uiElements.forEach { element ->
             element.animate()
@@ -198,11 +248,11 @@ class GroupCalendarActivity : AppCompatActivity() {
                 .setDuration(300)
                 .start()
         }
-        
+
         // 애니메이션 완료 후 캘린더 업데이트
         grid.postDelayed({
             updateCalendar()
-            
+
             // 새로운 UI 요소들에 페이드 인 애니메이션 적용
             uiElements.forEach { element ->
                 element.alpha = 0f
@@ -218,11 +268,25 @@ class GroupCalendarActivity : AppCompatActivity() {
 
     // 캘린더 업데이트 함수
     private fun updateCalendar() {
-        val textMonth = findViewById<TextView>(R.id.textMonth)
         val layoutYearMonth = findViewById<LinearLayout>(R.id.layoutYearMonth)
+        // 월에 따라 marginEnd 동적 조정
+        val params = layoutYearMonth.layoutParams as ViewGroup.MarginLayoutParams
+        if (month >= 10) {
+            params.marginEnd = (8 * resources.displayMetrics.density).toInt() // 8dp
+        } else {
+            params.marginEnd = (20 * resources.displayMetrics.density).toInt() // 20dp
+        }
+        layoutYearMonth.layoutParams = params
+        val textMonth = findViewById<TextView>(R.id.textMonth)
         
         // 상단 표시
         textMonth.text = month.toString()
+        // 월이 두 자리수면 letterSpacing을 더 좁게, 한 자리수면 기본값
+        if (month >= 10) {
+            textMonth.letterSpacing = -0.08f
+        } else {
+            textMonth.letterSpacing = 0f
+        }
         // 연/월 표시 업데이트 (layoutYearMonth의 두 번째 TextView)
         if (layoutYearMonth.childCount >= 2) {
             val tvYearMonth = layoutYearMonth.getChildAt(1) as? TextView

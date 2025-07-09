@@ -1,45 +1,42 @@
 package com.example.recordwithme.ui
 
+import android.app.AlertDialog
+import android.content.Intent
 import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.media.MediaPlayer
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.util.Base64
+import android.util.Log
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.EditText
+import android.widget.FrameLayout
+import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import android.graphics.Rect
-import android.widget.EditText
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKeys
+import com.example.recordwithme.BuildConfig
+import com.google.firebase.Timestamp
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-import com.google.firebase.auth.FirebaseAuth
-import android.app.AlertDialog
-import android.content.Intent
-import android.net.Uri
-import java.io.InputStream
-import com.google.firebase.Timestamp
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKeys
-import java.net.URL
-import java.net.HttpURLConnection
 import org.json.JSONObject
-import org.json.JSONArray
-import android.widget.FrameLayout
-import android.widget.RelativeLayout
-import android.media.MediaPlayer
-import android.widget.ImageButton
-import android.util.Log
-import com.example.recordwithme.BuildConfig
+import java.io.InputStream
+import java.net.HttpURLConnection
+import java.net.URL
 
 // 사진 데이터 클래스
 data class Comment(
@@ -93,371 +90,325 @@ class PhotoAdapter(
     ) : RecyclerView.ViewHolder(itemView)
 
     override fun getItemViewType(position: Int): Int {
-        return when (position) {
-            0 -> VIEW_TYPE_DATE
-            1 -> VIEW_TYPE_COUNT
-            else -> VIEW_TYPE_PHOTO
-        }
+        return VIEW_TYPE_PHOTO
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
         val context = parent.context
-        return when (viewType) {
-            VIEW_TYPE_DATE -> {
-                val tv = TextView(context).apply {
-                    textSize = 36f
-                    gravity = Gravity.CENTER
-                    setTextColor(Color.BLACK)
-                    setPadding(0, 0, 0, 32)
-                }
-                DateViewHolder(tv)
-            }
-            VIEW_TYPE_COUNT -> {
-                val tv = TextView(context).apply {
-                    textSize = 18f
-                    gravity = Gravity.CENTER
-                    setTextColor(Color.GRAY)
-                    setPadding(0, 0, 0, 32)
-                }
-                CountViewHolder(tv)
-            }
-            else -> {
-                // 기존 PhotoViewHolder 생성 코드
-                val container = FrameLayout(context).apply {
-                    setBackgroundColor(Color.WHITE)
-                    val padding = 32
-                    setPadding(padding, padding, padding, padding)
-                    val params = ViewGroup.MarginLayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT
-                    )
-                    params.bottomMargin = 32
-                    layoutParams = params
-                }
-                
-                // 내부 컨테이너 (기존 LinearLayout)
-                val innerContainer = LinearLayout(context).apply {
-                    orientation = LinearLayout.VERTICAL
-                    layoutParams = FrameLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT
-                    )
-                }
-                
-                val imageView = ImageView(context).apply {
-                    layoutParams = ViewGroup.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT
-                    )
-                    scaleType = ImageView.ScaleType.FIT_CENTER
-                    adjustViewBounds = true
-                }
-                
-                // 음악 정보 오버레이 (처음에는 숨김)
-                val musicText = TextView(context).apply {
-                    text = "🎵 이 순간과 어울리는 음악은 무엇일까요?"
-                    setTextColor(Color.WHITE)
-                    textSize = 16f
-                    setTypeface(null, android.graphics.Typeface.BOLD)
-                    setPadding(0, 0, 16, 0)
-                    layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 0.85f)
-                    maxLines = 1
-                    ellipsize = android.text.TextUtils.TruncateAt.END
-                    setShadowLayer(4f, 0f, 0f, Color.BLACK)
-                    maxWidth = (180 * context.resources.displayMetrics.density).toInt() // 180dp 제한
-                }
-                val playButton = ImageButton(context).apply {
-                    setImageResource(android.R.drawable.ic_media_play)
-                    setBackgroundColor(Color.TRANSPARENT)
-                    setColorFilter(Color.BLACK)
-                    layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 0.15f)
-                    visibility = View.GONE // 처음엔 안 보이게
-                }
-                val musicOverlay = LinearLayout(context).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    setBackgroundColor(Color.TRANSPARENT)
-                    gravity = Gravity.CENTER_VERTICAL
-                    layoutParams = LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT
-                    )
-                    setPadding(24, 16, 24, 16)
-                    weightSum = 1f
-                    visibility = View.VISIBLE // 항상 보이게
-                    addView(musicText)
-                    addView(playButton)
-                }
-                
-                val descView = TextView(context).apply {
-                    setTextColor(Color.DKGRAY)
-                    textSize = 15f
-                    setPadding(0, 16, 0, 16)
-                }
-                val divider = View(context).apply {
-                    setBackgroundColor(Color.LTGRAY)
-                    layoutParams = ViewGroup.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        2
-                    )
-                }
-                val commentsView = LinearLayout(context).apply {
-                    orientation = LinearLayout.VERTICAL
-                    setPadding(0, 8, 0, 8)
-                }
-                val commentInput = EditText(context).apply {
-                    hint = "댓글을 입력하세요"
-                    textSize = 13f
-                }
-                val commentButton = Button(context).apply {
-                    text = "등록"
-                    textSize = 13f
-                    setBackgroundColor(Color.BLACK)
-                    setTextColor(Color.WHITE)
-                }
-                val deleteButton = Button(context).apply {
-                    text = "삭제"
-                    textSize = 13f
-                    setBackgroundColor(Color.BLACK)
-                    setTextColor(Color.WHITE)
-                }
-                val buttonSpacer = View(context).apply {
-                    layoutParams = LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        12 // 등록-삭제 버튼과 동일하게 12px 높이로 변경
-                    )
-                }
-                val labelButton = Button(context).apply {
-                    text = "어울리는 음악 재생"
-                    textSize = 13f
-                    setBackgroundColor(Color.parseColor("#1976D2"))
-                    setTextColor(Color.WHITE)
-                }
-                val deleteParams = LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                )
-                deleteParams.topMargin = 12
-                deleteButton.layoutParams = deleteParams
-                innerContainer.addView(imageView)
-                innerContainer.addView(musicOverlay)
-                innerContainer.addView(descView)
-                innerContainer.addView(divider)
-                innerContainer.addView(commentsView)
-                innerContainer.addView(commentInput)
-                innerContainer.addView(commentButton)
-                innerContainer.addView(deleteButton)
-                innerContainer.addView(buttonSpacer)
-                innerContainer.addView(labelButton)
-                
-                container.addView(innerContainer)
-                
-                PhotoViewHolder(imageView, descView, commentsView, commentInput, commentButton, deleteButton, labelButton, musicOverlay, musicText, playButton, container)
-            }
+        // 기존 PhotoViewHolder 생성 코드
+        val container = FrameLayout(context).apply {
+            setBackgroundColor(Color.WHITE)
+            val padding = 32
+            setPadding(padding, padding, padding, padding)
+            val params = ViewGroup.MarginLayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+            params.bottomMargin = 32
+            layoutParams = params
         }
+        
+        // 내부 컨테이너 (기존 LinearLayout)
+        val innerContainer = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        }
+        
+        val imageView = ImageView(context).apply {
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            adjustViewBounds = true
+        }
+        
+        // 음악 정보 오버레이 (처음에는 숨김)
+        val musicText = TextView(context).apply {
+            text = "🎵 이 순간과 어울리는 음악은 무엇일까요?"
+            setTextColor(Color.WHITE)
+            textSize = 16f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setPadding(0, 0, 16, 0)
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 0.85f)
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            setShadowLayer(4f, 0f, 0f, Color.BLACK)
+            maxWidth = (180 * context.resources.displayMetrics.density).toInt() // 180dp 제한
+        }
+        val playButton = ImageButton(context).apply {
+            setImageResource(android.R.drawable.ic_media_play)
+            setBackgroundColor(Color.TRANSPARENT)
+            setColorFilter(Color.BLACK)
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 0.15f)
+            visibility = View.GONE // 처음엔 안 보이게
+        }
+        val musicOverlay = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setBackgroundColor(Color.TRANSPARENT)
+            gravity = Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+            setPadding(24, 16, 24, 16)
+            weightSum = 1f
+            visibility = View.VISIBLE // 항상 보이게
+            addView(musicText)
+            addView(playButton)
+        }
+        
+        val descView = TextView(context).apply {
+            setTextColor(Color.DKGRAY)
+            textSize = 15f
+            setPadding(0, 16, 0, 16)
+        }
+        val divider = View(context).apply {
+            setBackgroundColor(Color.LTGRAY)
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                2
+            )
+        }
+        val commentsView = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, 8, 0, 8)
+        }
+        val commentInput = EditText(context).apply {
+            hint = "댓글을 입력하세요"
+            textSize = 13f
+        }
+        val commentButton = Button(context).apply {
+            text = "등록"
+            textSize = 13f
+            setBackgroundColor(Color.BLACK)
+            setTextColor(Color.WHITE)
+        }
+        val deleteButton = Button(context).apply {
+            text = "삭제"
+            textSize = 13f
+            setBackgroundColor(Color.BLACK)
+            setTextColor(Color.WHITE)
+        }
+        val buttonSpacer = View(context).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                12 // 등록-삭제 버튼과 동일하게 12px 높이로 변경
+            )
+        }
+        val labelButton = Button(context).apply {
+            text = "어울리는 음악 재생"
+            textSize = 13f
+            setBackgroundColor(Color.parseColor("#1976D2"))
+            setTextColor(Color.WHITE)
+        }
+        val deleteParams = LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        )
+        deleteParams.topMargin = 12
+        deleteButton.layoutParams = deleteParams
+        innerContainer.addView(imageView)
+        innerContainer.addView(musicOverlay)
+        innerContainer.addView(descView)
+        innerContainer.addView(divider)
+        innerContainer.addView(commentsView)
+        innerContainer.addView(commentInput)
+        innerContainer.addView(commentButton)
+        innerContainer.addView(deleteButton)
+        innerContainer.addView(buttonSpacer)
+        innerContainer.addView(labelButton)
+        
+        container.addView(innerContainer)
+        
+        return PhotoViewHolder(imageView, descView, commentsView, commentInput, commentButton, deleteButton, labelButton, musicOverlay, musicText, playButton, container)
     }
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
-        when (getItemViewType(position)) {
-            VIEW_TYPE_DATE -> {
-                (holder as DateViewHolder).textView.text = dateString
+        val photoIdx = position
+        val photo = photos[photoIdx]
+        val photoHolder = holder as PhotoViewHolder
+        // 항상 초기화
+        photoHolder.musicText.text = "🎵 이 순간과 어울리는 음악은 무엇일까요?"
+        photoHolder.playButton.visibility = View.GONE
+        // 이하 기존 PhotoAdapter의 onBindViewHolder 내용에서 position -> photoIdx로 변경
+        if (photo.isBase64) {
+            try {
+                val bytes = Base64.decode(photo.url, Base64.DEFAULT)
+                val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                photoHolder.imageView.setImageBitmap(bitmap)
+            } catch (e: Exception) {
+                photoHolder.imageView.setImageResource(android.R.drawable.ic_menu_gallery)
             }
-            VIEW_TYPE_COUNT -> {
-                (holder as CountViewHolder).textView.text = "이 날의 사진: ${photoCount}장"
-                holder.textView.setTextColor(if (photoCount == 0) Color.GRAY else Color.BLUE)
+        } else if (photo.url.startsWith("https://")) {
+            photoHolder.imageView.setImageResource(android.R.drawable.ic_menu_gallery)
+        }
+        photoHolder.descView.text = if (photo.description.isBlank()) "+설명" else photo.description
+        photoHolder.descView.setTextColor(
+            if (photo.description.isBlank()) Color.parseColor("#1976D2") else Color.DKGRAY
+        )
+        photoHolder.descView.setOnClickListener {
+            val editText = EditText(photoHolder.descView.context).apply {
+                setText(photo.description)
+                hint = "설명을 입력하세요"
             }
-            VIEW_TYPE_PHOTO -> {
-                val photoIdx = position - 2
-                val photo = photos[photoIdx]
-                val photoHolder = holder as PhotoViewHolder
-                // 항상 초기화
-                photoHolder.musicText.text = "🎵 이 순간과 어울리는 음악은 무엇일까요?"
-                photoHolder.playButton.visibility = View.GONE
-                // 이하 기존 PhotoAdapter의 onBindViewHolder 내용에서 position -> photoIdx로 변경
-                if (photo.isBase64) {
-                    try {
-                        val bytes = Base64.decode(photo.url, Base64.DEFAULT)
-                        val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                        photoHolder.imageView.setImageBitmap(bitmap)
-                    } catch (e: Exception) {
-                        photoHolder.imageView.setImageResource(android.R.drawable.ic_menu_gallery)
+            AlertDialog.Builder(photoHolder.descView.context)
+                .setTitle(if (photo.description.isBlank()) "설명 추가" else "설명 수정")
+                .setView(editText)
+                .setPositiveButton("저장") { _, _ ->
+                    val newDesc = editText.text.toString().trim()
+                    if (newDesc.isNotEmpty() && newDesc != photo.description) {
+                        val firestore = FirebaseFirestore.getInstance()
+                        val photoId = photoDocIds[photoIdx]
+                        val photoDocRef = firestore.collection("groups")
+                            .document(groupId)
+                            .collection("photos")
+                            .document(photoId)
+                        photoDocRef.update("description", newDesc)
+                            .addOnSuccessListener { onRefresh() }
                     }
-                } else if (photo.url.startsWith("https://")) {
-                    photoHolder.imageView.setImageResource(android.R.drawable.ic_menu_gallery)
                 }
-                photoHolder.descView.text = if (photo.description.isBlank()) "+설명" else photo.description
-                photoHolder.descView.setTextColor(
-                    if (photo.description.isBlank()) Color.parseColor("#1976D2") else Color.DKGRAY
-                )
-                photoHolder.descView.setOnClickListener {
-                    val editText = EditText(photoHolder.descView.context).apply {
-                        setText(photo.description)
-                        hint = "설명을 입력하세요"
-                    }
-                    AlertDialog.Builder(photoHolder.descView.context)
-                        .setTitle(if (photo.description.isBlank()) "설명 추가" else "설명 수정")
-                        .setView(editText)
-                        .setPositiveButton("저장") { _, _ ->
-                            val newDesc = editText.text.toString().trim()
-                            if (newDesc.isNotEmpty() && newDesc != photo.description) {
-                                val firestore = FirebaseFirestore.getInstance()
-                                val photoId = photoDocIds[photoIdx]
-                                val photoDocRef = firestore.collection("groups")
-                                    .document(groupId)
-                                    .collection("photos")
-                                    .document(photoId)
-                                photoDocRef.update("description", newDesc)
-                                    .addOnSuccessListener { onRefresh() }
+                .setNegativeButton("취소", null)
+                .show()
+        }
+        photoHolder.commentsView.removeAllViews()
+        if (photo.comments.isEmpty()) {
+            val emptyView = TextView(photoHolder.commentsView.context).apply {
+                text = "댓글이 없습니다"
+                setTextColor(Color.LTGRAY)
+                textSize = 12f
+            }
+            photoHolder.commentsView.addView(emptyView)
+        } else {
+            for (comment in photo.comments) {
+                val commentView = TextView(photoHolder.commentsView.context).apply {
+                    text = "${comment.userId} : ${comment.text}"
+                    setTextColor(Color.GRAY)
+                    textSize = 13f
+                    setPadding(0, 4, 0, 4)
+                }
+                photoHolder.commentsView.addView(commentView)
+            }
+        }
+        photoHolder.commentButton.setOnClickListener {
+            val newCommentText = photoHolder.commentInput.text.toString().trim()
+            if (newCommentText.isNotEmpty()) {
+                val uid = FirebaseAuth.getInstance().currentUser?.uid
+                if (uid != null) {
+                    val usersRef = FirebaseFirestore.getInstance().collection("users")
+                    usersRef.document(uid).get().addOnSuccessListener { document ->
+                        val userName = document.getString("name") ?: "익명"
+                        val firestore = FirebaseFirestore.getInstance()
+                        val photoId = photoDocIds[photoIdx]
+                        val photoDocRef = firestore.collection("groups")
+                            .document(groupId)
+                            .collection("photos")
+                            .document(photoId)
+                        val commentMap = mapOf("userId" to userName, "text" to newCommentText)
+                        photoDocRef.update("comments", com.google.firebase.firestore.FieldValue.arrayUnion(commentMap))
+                            .addOnSuccessListener {
+                                photoHolder.commentInput.setText("")
+                                onRefresh()
                             }
-                        }
-                        .setNegativeButton("취소", null)
-                        .show()
-                }
-                photoHolder.commentsView.removeAllViews()
-                if (photo.comments.isEmpty()) {
-                    val emptyView = TextView(photoHolder.commentsView.context).apply {
-                        text = "댓글이 없습니다"
-                        setTextColor(Color.LTGRAY)
-                        textSize = 12f
-                    }
-                    photoHolder.commentsView.addView(emptyView)
-                } else {
-                    for (comment in photo.comments) {
-                        val commentView = TextView(photoHolder.commentsView.context).apply {
-                            text = "${comment.userId} : ${comment.text}"
-                            setTextColor(Color.GRAY)
-                            textSize = 13f
-                            setPadding(0, 4, 0, 4)
-                        }
-                        photoHolder.commentsView.addView(commentView)
                     }
                 }
-                photoHolder.commentButton.setOnClickListener {
-                    val newCommentText = photoHolder.commentInput.text.toString().trim()
-                    if (newCommentText.isNotEmpty()) {
-                        val uid = FirebaseAuth.getInstance().currentUser?.uid
-                        if (uid != null) {
-                            val usersRef = FirebaseFirestore.getInstance().collection("users")
-                            usersRef.document(uid).get().addOnSuccessListener { document ->
-                                val userName = document.getString("name") ?: "익명"
-                                val firestore = FirebaseFirestore.getInstance()
-                                val photoId = photoDocIds[photoIdx]
-                                val photoDocRef = firestore.collection("groups")
-                                    .document(groupId)
-                                    .collection("photos")
-                                    .document(photoId)
-                                val commentMap = mapOf("userId" to userName, "text" to newCommentText)
-                                photoDocRef.update("comments", com.google.firebase.firestore.FieldValue.arrayUnion(commentMap))
-                                    .addOnSuccessListener {
-                                        photoHolder.commentInput.setText("")
-                                        onRefresh()
+            }
+        }
+        val context = photoHolder.itemView.context
+        val photoId = photoDocIds[photoIdx]
+        photoHolder.deleteButton.setOnClickListener {
+            AlertDialog.Builder(context)
+                .setTitle("사진 삭제")
+                .setMessage("정말 삭제하시겠습니까?")
+                .setPositiveButton("삭제") { _, _ ->
+                    val firestore = FirebaseFirestore.getInstance()
+                    firestore.collection("groups")
+                        .document(groupId)
+                        .collection("photos")
+                        .document(photoId)
+                        .delete()
+                        .addOnSuccessListener { onRefresh() }
+                }
+                .setNegativeButton("취소", null)
+                .show()
+        }
+        // 라벨 추출 버튼 클릭 리스너
+        photoHolder.labelButton.setOnClickListener {
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    (photoHolder.itemView.context as? android.app.Activity)?.runOnUiThread {
+                        photoHolder.musicOverlay.visibility = View.VISIBLE
+                    }
+                    val visionApiKey = BuildConfig.VISION_API_KEY
+                    val labels = com.example.recordwithme.util.VisionApiHelper.getLabelsFromVisionApi(
+                        photo.url, // Base64 데이터
+                        visionApiKey
+                    )
+                    Log.d("SpotifyDebug", "Vision 라벨: $labels")
+                    if (labels.isNotEmpty()) {
+                        val masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
+                        val prefs = EncryptedSharedPreferences.create(
+                            "spotify_prefs",
+                            masterKeyAlias,
+                            photoHolder.itemView.context,
+                            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+                        )
+                        val accessToken = prefs.getString("access_token", null)
+                        if (accessToken != null) {
+                            val musicKeywords = listOf("k-pop", "Korean", "노래", "music")
+                            val searchQuery = (labels.take(3) + musicKeywords).joinToString(" ")
+                            val tracks = searchSpotifyTracks(searchQuery, accessToken)
+                            Log.d("SpotifyDebug", "검색 쿼리: $searchQuery, 트랙 수: ${tracks.size}")
+                            if (tracks.isNotEmpty()) {
+                                val playableTrack = tracks.firstOrNull { it.previewUrl != null }
+                                if (playableTrack != null) {
+                                    Log.d("SpotifyDebug", "첫 미리듣기 곡: ${playableTrack.name}, previewUrl: ${playableTrack.previewUrl}")
+                                    (photoHolder.itemView.context as? android.app.Activity)?.runOnUiThread {
+                                        val musicText = photoHolder.musicText
+                                        musicText.text = "🎵 ${playableTrack.name} - ${playableTrack.artist}"
+                                        val playButton = photoHolder.playButton
+                                        playButton.setImageResource(android.R.drawable.ic_media_pause)
+                                        playButton.visibility = View.VISIBLE
+                                        playButton.setOnClickListener {
+                                            togglePlayPause(playableTrack.previewUrl, photoHolder, photoIdx)
+                                        }
+                                        photoHolder.itemView.tag = playableTrack
+                                        // 자동 재생
+                                        playPreviewUrl(playableTrack.previewUrl, photoHolder, photoIdx, autoPlay = true)
                                     }
-                            }
-                        }
-                    }
-                }
-                val context = photoHolder.itemView.context
-                val photoId = photoDocIds[photoIdx]
-                photoHolder.deleteButton.setOnClickListener {
-                    AlertDialog.Builder(context)
-                        .setTitle("사진 삭제")
-                        .setMessage("정말 삭제하시겠습니까?")
-                        .setPositiveButton("삭제") { _, _ ->
-                            val firestore = FirebaseFirestore.getInstance()
-                            firestore.collection("groups")
-                                .document(groupId)
-                                .collection("photos")
-                                .document(photoId)
-                                .delete()
-                                .addOnSuccessListener { onRefresh() }
-                        }
-                        .setNegativeButton("취소", null)
-                        .show()
-                }
-                // 라벨 추출 버튼 클릭 리스너
-                photoHolder.labelButton.setOnClickListener {
-                    CoroutineScope(Dispatchers.IO).launch {
-                        try {
-                            (photoHolder.itemView.context as? android.app.Activity)?.runOnUiThread {
-                                photoHolder.musicOverlay.visibility = View.VISIBLE
-                            }
-                            val visionApiKey = BuildConfig.VISION_API_KEY
-                            val labels = com.example.recordwithme.util.VisionApiHelper.getLabelsFromVisionApi(
-                                photo.url, // Base64 데이터
-                                visionApiKey
-                            )
-                            Log.d("SpotifyDebug", "Vision 라벨: $labels")
-                            if (labels.isNotEmpty()) {
-                                val masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
-                                val prefs = EncryptedSharedPreferences.create(
-                                    "spotify_prefs",
-                                    masterKeyAlias,
-                                    photoHolder.itemView.context,
-                                    EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                                    EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-                                )
-                                val accessToken = prefs.getString("access_token", null)
-                                if (accessToken != null) {
-                                    val musicKeywords = listOf("k-pop", "Korean", "노래", "music")
-                                    val searchQuery = (labels.take(3) + musicKeywords).joinToString(" ")
-                                    val tracks = searchSpotifyTracks(searchQuery, accessToken)
-                                    Log.d("SpotifyDebug", "검색 쿼리: $searchQuery, 트랙 수: ${tracks.size}")
-                                    if (tracks.isNotEmpty()) {
-                                        val playableTrack = tracks.firstOrNull { it.previewUrl != null }
-                                        if (playableTrack != null) {
-                                            Log.d("SpotifyDebug", "첫 미리듣기 곡: ${playableTrack.name}, previewUrl: ${playableTrack.previewUrl}")
+                                } else {
+                                    // iTunes에서 미리듣기 URL 시도
+                                    val mostPopularTrack = tracks.maxByOrNull { it.popularity }
+                                    if (mostPopularTrack != null) {
+                                        Log.d("SpotifyDebug", "iTunes 검색용 곡 정보(인기순): name=${mostPopularTrack.name}, artist=${mostPopularTrack.artist}, popularity=${mostPopularTrack.popularity}")
+                                        val itunesPreviewUrl = getItunesPreviewUrl(mostPopularTrack.name, mostPopularTrack.artist)
+                                        if (itunesPreviewUrl != null) {
+                                            Log.d("SpotifyDebug", "iTunes 미리듣기 URL: $itunesPreviewUrl")
                                             (photoHolder.itemView.context as? android.app.Activity)?.runOnUiThread {
                                                 val musicText = photoHolder.musicText
-                                                musicText.text = "🎵 ${playableTrack.name} - ${playableTrack.artist}"
+                                                musicText.text = "🎵 ${mostPopularTrack.name} - ${mostPopularTrack.artist} (iTunes)"
                                                 val playButton = photoHolder.playButton
                                                 playButton.setImageResource(android.R.drawable.ic_media_pause)
                                                 playButton.visibility = View.VISIBLE
                                                 playButton.setOnClickListener {
-                                                    togglePlayPause(playableTrack.previewUrl, photoHolder, photoIdx)
+                                                    togglePlayPause(itunesPreviewUrl, photoHolder, photoIdx)
                                                 }
-                                                photoHolder.itemView.tag = playableTrack
+                                                photoHolder.itemView.tag = mostPopularTrack
                                                 // 자동 재생
-                                                playPreviewUrl(playableTrack.previewUrl, photoHolder, photoIdx, autoPlay = true)
+                                                playPreviewUrl(itunesPreviewUrl, photoHolder, photoIdx, autoPlay = true)
                                             }
                                         } else {
-                                            // iTunes에서 미리듣기 URL 시도
-                                            val mostPopularTrack = tracks.maxByOrNull { it.popularity }
-                                            if (mostPopularTrack != null) {
-                                                Log.d("SpotifyDebug", "iTunes 검색용 곡 정보(인기순): name=${mostPopularTrack.name}, artist=${mostPopularTrack.artist}, popularity=${mostPopularTrack.popularity}")
-                                                val itunesPreviewUrl = getItunesPreviewUrl(mostPopularTrack.name, mostPopularTrack.artist)
-                                                if (itunesPreviewUrl != null) {
-                                                    Log.d("SpotifyDebug", "iTunes 미리듣기 URL: $itunesPreviewUrl")
-                                                    (photoHolder.itemView.context as? android.app.Activity)?.runOnUiThread {
-                                                        val musicText = photoHolder.musicText
-                                                        musicText.text = "🎵 ${mostPopularTrack.name} - ${mostPopularTrack.artist} (iTunes)"
-                                                        val playButton = photoHolder.playButton
-                                                        playButton.setImageResource(android.R.drawable.ic_media_pause)
-                                                        playButton.visibility = View.VISIBLE
-                                                        playButton.setOnClickListener {
-                                                            togglePlayPause(itunesPreviewUrl, photoHolder, photoIdx)
-                                                        }
-                                                        photoHolder.itemView.tag = mostPopularTrack
-                                                        // 자동 재생
-                                                        playPreviewUrl(itunesPreviewUrl, photoHolder, photoIdx, autoPlay = true)
-                                                    }
-                                                } else {
-                                                    (photoHolder.itemView.context as? android.app.Activity)?.runOnUiThread {
-                                                        photoHolder.musicOverlay.visibility = View.GONE
-                                                        android.widget.Toast.makeText(
-                                                            photoHolder.itemView.context,
-                                                            "미리듣기 가능한 곡이 없습니다.",
-                                                            android.widget.Toast.LENGTH_LONG
-                                                        ).show()
-                                                    }
-                                                }
-                                            } else {
-                                                (photoHolder.itemView.context as? android.app.Activity)?.runOnUiThread {
-                                                    photoHolder.musicOverlay.visibility = View.GONE
-                                                    android.widget.Toast.makeText(
-                                                        photoHolder.itemView.context,
-                                                        "미리듣기 가능한 곡이 없습니다.",
-                                                        android.widget.Toast.LENGTH_LONG
-                                                    ).show()
-                                                }
+                                            (photoHolder.itemView.context as? android.app.Activity)?.runOnUiThread {
+                                                photoHolder.musicOverlay.visibility = View.GONE
+                                                android.widget.Toast.makeText(
+                                                    photoHolder.itemView.context,
+                                                    "미리듣기 가능한 곡이 없습니다.",
+                                                    android.widget.Toast.LENGTH_LONG
+                                                ).show()
                                             }
                                         }
                                     } else {
@@ -465,19 +416,10 @@ class PhotoAdapter(
                                             photoHolder.musicOverlay.visibility = View.GONE
                                             android.widget.Toast.makeText(
                                                 photoHolder.itemView.context,
-                                                "검색 결과가 없습니다.",
+                                                "미리듣기 가능한 곡이 없습니다.",
                                                 android.widget.Toast.LENGTH_LONG
                                             ).show()
                                         }
-                                    }
-                                } else {
-                                    (photoHolder.itemView.context as? android.app.Activity)?.runOnUiThread {
-                                        photoHolder.musicOverlay.visibility = View.GONE
-                                        android.widget.Toast.makeText(
-                                            photoHolder.itemView.context,
-                                            "Spotify 로그인이 필요합니다.",
-                                            android.widget.Toast.LENGTH_LONG
-                                        ).show()
                                     }
                                 }
                             } else {
@@ -485,28 +427,46 @@ class PhotoAdapter(
                                     photoHolder.musicOverlay.visibility = View.GONE
                                     android.widget.Toast.makeText(
                                         photoHolder.itemView.context,
-                                        "라벨을 추출할 수 없습니다.",
+                                        "검색 결과가 없습니다.",
                                         android.widget.Toast.LENGTH_LONG
                                     ).show()
                                 }
                             }
-                        } catch (e: Exception) {
+                        } else {
                             (photoHolder.itemView.context as? android.app.Activity)?.runOnUiThread {
                                 photoHolder.musicOverlay.visibility = View.GONE
                                 android.widget.Toast.makeText(
                                     photoHolder.itemView.context,
-                                    "오류: ${e.message}",
+                                    "Spotify 로그인이 필요합니다.",
                                     android.widget.Toast.LENGTH_LONG
                                 ).show()
                             }
                         }
+                    } else {
+                        (photoHolder.itemView.context as? android.app.Activity)?.runOnUiThread {
+                            photoHolder.musicOverlay.visibility = View.GONE
+                            android.widget.Toast.makeText(
+                                photoHolder.itemView.context,
+                                "라벨을 추출할 수 없습니다.",
+                                android.widget.Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    }
+                } catch (e: Exception) {
+                    (photoHolder.itemView.context as? android.app.Activity)?.runOnUiThread {
+                        photoHolder.musicOverlay.visibility = View.GONE
+                        android.widget.Toast.makeText(
+                            photoHolder.itemView.context,
+                            "오류: ${e.message}",
+                            android.widget.Toast.LENGTH_LONG
+                        ).show()
                     }
                 }
             }
         }
     }
 
-    override fun getItemCount(): Int = 2 + photos.size
+    override fun getItemCount(): Int = photos.size
 
     // Preview URL 재생 함수
     private fun playPreviewUrl(previewUrl: String?, photoHolder: PhotoViewHolder, photoIdx: Int, autoPlay: Boolean = false) {
@@ -635,12 +595,22 @@ class DayDetailActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
+        // 시스템 UI(상단바, 하단바) 숨기기
+        window.decorView.systemUiVisibility =
+            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
+            View.SYSTEM_UI_FLAG_FULLSCREEN or
+            View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+        
         day = intent.getIntExtra("day", -1)
         year = intent.getIntExtra("year", -1)
         month = intent.getIntExtra("month", -1)
         groupId = intent.getStringExtra("groupId") ?: ""
         groupName = intent.getStringExtra("groupName") ?: ""
         val receivedTransitionName = intent.getStringExtra("transitionName") ?: ""
+        
+        // 디버깅을 위한 로그
+        Log.d("DayDetailActivity", "받은 groupId: $groupId")
+        Log.d("DayDetailActivity", "받은 groupName: $groupName")
         
         // 메인 레이아웃 생성
         val layout = LinearLayout(this).apply {
@@ -655,17 +625,48 @@ class DayDetailActivity : AppCompatActivity() {
             }
         }
         
-        val topBar = LinearLayout(this).apply {
+        // 날짜 텍스트를 맨 위 중앙에 배치
+        val dateText = TextView(this).apply {
+            text = "${groupName}\n${year}년 ${month}월 ${day}일"
+            textSize = 32f
+            setTextColor(Color.BLACK)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            gravity = Gravity.CENTER
+            setPadding(0, 32, 0, 8)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
+        layout.addView(dateText)
+        
+        // 사진 개수 텍스트를 날짜 아래에 배치
+        val photoCountText = TextView(this).apply {
+            text = "이 날의 사진: 0장"
+            textSize = 14f
+            setTextColor(Color.GRAY)
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, 24)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
+        layout.addView(photoCountText)
+        
+        // 버튼들을 그 아래에 배치
+        val buttonBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
+            setPadding(0, 16, 0, 32)
         }
 
         val backButton = Button(this).apply {
-            text = "◀"
+            text = "◀ ${groupName} 화면으로 돌아가기"
             textSize = 30f
             setTextColor(Color.BLACK)
             setBackgroundColor(Color.TRANSPARENT)
@@ -689,10 +690,10 @@ class DayDetailActivity : AppCompatActivity() {
             setOnClickListener { addPhoto() }
         }
 
-        topBar.addView(backButton)
-        topBar.addView(space)
-        topBar.addView(addButton)
-        layout.addView(topBar)
+        buttonBar.addView(backButton)
+        buttonBar.addView(space)
+        buttonBar.addView(addButton)
+        layout.addView(buttonBar)
         
         // RecyclerView 생성
         val recyclerView = RecyclerView(this).apply {
@@ -728,6 +729,9 @@ class DayDetailActivity : AppCompatActivity() {
                         .get()
                         .await()
                     val photoCount = snapshot.size()
+                    // photoCountText 업데이트
+                    photoCountText.text = "이 날의 사진: ${photoCount}장"
+                    
                     val photoList = mutableListOf<PhotoData>()
                     val photoDocIds = mutableListOf<String>()
                     for (document in snapshot.documents) {
@@ -765,6 +769,9 @@ class DayDetailActivity : AppCompatActivity() {
                     }
                     photoAdapter = recyclerView.adapter as PhotoAdapter
                 } catch (e: Exception) {
+                    // photoCountText 업데이트 (에러 시)
+                    photoCountText.text = "이 날의 사진: 0장"
+                    
                     recyclerView.adapter = PhotoAdapter(
                         dateString = "${groupName}\n${year}년 ${month}월 ${day}일",
                         photoCount = 0,
@@ -786,6 +793,29 @@ class DayDetailActivity : AppCompatActivity() {
         }
         
         loadPhotosFunc = { loadPhotos() }
+        
+        // 그룹 이름이 없으면 Firestore에서 조회
+        if (groupName.isEmpty() && groupId.isNotEmpty()) {
+            Log.d("DayDetailActivity", "Firestore에서 그룹 이름 조회 시작")
+            val firestore = FirebaseFirestore.getInstance()
+            firestore.collection("groups").document(groupId).get()
+                .addOnSuccessListener { document ->
+                    if (document != null && document.exists()) {
+                        groupName = document.getString("name") ?: ""
+                        Log.d("DayDetailActivity", "Firestore에서 조회한 groupName: $groupName")
+                        // UI 업데이트
+                        dateText.text = "${groupName}\n${year}년 ${month}월 ${day}일"
+                        backButton.text = "◀ ${groupName} 화면으로 돌아가기"
+                    } else {
+                        Log.d("DayDetailActivity", "Firestore 문서가 존재하지 않음")
+                    }
+                }
+                .addOnFailureListener { e ->
+                    Log.e("DayDetailActivity", "Firestore 조회 실패: ${e.message}")
+                }
+        } else {
+            Log.d("DayDetailActivity", "groupName이 이미 있음: $groupName")
+        }
         
         setContentView(layout)
         

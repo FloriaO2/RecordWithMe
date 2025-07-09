@@ -1,6 +1,5 @@
 package com.example.recordwithme.ui
 
-import android.content.Intent
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -24,8 +23,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -35,6 +34,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -372,8 +372,8 @@ fun GroupScreen(navController: NavController) {
                                                 }
                                         } else {
                                             // 멤버가 있으면 멤버 목록만 업데이트
-                                            FirebaseFirestore.getInstance().collection("groups").document(groupToLeave.id)
-                                                .update("members", members)
+                                        FirebaseFirestore.getInstance().collection("groups").document(groupToLeave.id)
+                                            .update("members", members)
                                         }
                                     }
                                     if (selectedGroupId == groupToLeave.id) {
@@ -433,6 +433,7 @@ fun GroupItem(
 ) {
     val firestore = FirebaseFirestore.getInstance()
     val groupId = group.id
+    val context = LocalContext.current
 
     var membersCount by remember { mutableStateOf(group.membersCount) }
 
@@ -456,7 +457,7 @@ fun GroupItem(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 0.dp, vertical = (localScreenHeight.value * 0.008f).dp)
+            .padding(horizontal = 0.dp, vertical = (localScreenHeight.value * 0.01f).dp)
             .border(
                 width = 1.dp,
                 color = if (isExpanded) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else Color.LightGray,
@@ -504,6 +505,21 @@ fun GroupItem(
                             color = if (isExpanded) Color(0xFF1A237E) else Color.Gray,
                             fontSize = (localScreenWidth.value * 0.035f).sp
                         )
+                    )
+                }
+                IconButton(
+                    onClick = {
+                        val intent = android.content.Intent(context, com.example.recordwithme.ui.GroupCalendarActivity::class.java)
+                        intent.putExtra("groupId", group.id)
+                        intent.putExtra("groupName", group.name)
+                        context.startActivity(intent)
+                    },
+                    modifier = Modifier.size((localScreenWidth.value * 0.07f).dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.CalendarToday,
+                        contentDescription = "그룹 캘린더 바로가기",
+                        tint = MaterialTheme.colorScheme.primary
                     )
                 }
             }
@@ -618,7 +634,7 @@ fun GroupDetailPanel(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = (screenWidth.value * 0.025f).dp, vertical = (screenHeight.value * 0.015f).dp)
+                            .padding(horizontal = (screenWidth.value * 0.025f).dp, vertical = (screenHeight.value * 0f).dp)
                             .background(
                                 color = Color(0xFFF5F6FA),
                                 shape = RoundedCornerShape(10.dp)
@@ -627,16 +643,16 @@ fun GroupDetailPanel(
                                 width = 1.dp,
                                 color = Color(0xFFE0E3EB),
                                 shape = RoundedCornerShape(10.dp)
-                            )
+                    )
                     ) {
-                        Text(
-                            text = group.note,
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontSize = (screenWidth.value * 0.035f).sp,
+                    Text(
+                        text = group.note,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontSize = (screenWidth.value * 0.035f).sp,
                                 color = Color.Black
-                            ),
-                            modifier = Modifier.padding(12.dp)
-                        )
+                        ),
+                            modifier = Modifier.padding(16.dp)
+                    )
                     }
                 }
 
@@ -707,23 +723,6 @@ fun GroupDetailPanel(
                     verticalArrangement = Arrangement.spacedBy((screenHeight.value * 0.003f).dp)
                 ) {
                     TextButton(
-                        onClick = { /* 편집 기능 */ },
-                        modifier = Modifier.align(Alignment.Start)
-                    ) {
-                        Icon(
-                            Icons.Filled.Edit,
-                            contentDescription = "Edit",
-                            modifier = Modifier.size((screenWidth.value * 0.04f).dp),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.width((screenWidth.value * 0.02f).dp))
-                        Text(
-                            text = "편집",
-                            fontSize = (screenWidth.value * 0.035f).sp,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                        TextButton(
                             onClick = {
                                 showLeaveDialog = true
                             },
@@ -741,28 +740,6 @@ fun GroupDetailPanel(
                                 fontSize = (screenWidth.value * 0.035f).sp,
                                 color = Color.Red
                             )
-                        }
-
-                    TextButton(
-                        onClick = {
-                            val intent = Intent(context, com.example.recordwithme.ui.GroupCalendarActivity::class.java)
-                            intent.putExtra("groupId", group.id)
-                            context.startActivity(intent)
-                        },
-                        modifier = Modifier.align(Alignment.Start)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Person, // 캘린더 아이콘으로 교체 가능
-                            contentDescription = "Group Calendar",
-                            modifier = Modifier.size((screenWidth.value * 0.04f).dp),
-                            tint = MaterialTheme.colorScheme.secondary
-                        )
-                        Spacer(modifier = Modifier.width((screenWidth.value * 0.02f).dp))
-                        Text(
-                            text = "그룹 캘린더",
-                            fontSize = (screenWidth.value * 0.035f).sp,
-                            color = MaterialTheme.colorScheme.secondary
-                        )
                     }
                 }
             }
@@ -808,19 +785,19 @@ fun GroupDetailPanel(
                         // 코루틴 스코프에서 비동기 작업 실행
                         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
                             try {
-                                // 그룹 초대 로직 (프로필과 동일)
-                                val groupName = group.name
-                                val groupNote = group.note
-                                val groupCreator = group.creator
-                                val groupMembers = group.members
-                                val groupId = group.id
-                                val groupData = mapOf(
-                                    "groupId" to groupId,
-                                    "name" to groupName,
-                                    "note" to groupNote,
-                                    "creator" to groupCreator,
-                                    "members" to groupMembers
-                                )
+                        // 그룹 초대 로직 (프로필과 동일)
+                        val groupName = group.name
+                        val groupNote = group.note
+                        val groupCreator = group.creator
+                        val groupMembers = group.members
+                        val groupId = group.id
+                        val groupData = mapOf(
+                            "groupId" to groupId,
+                            "name" to groupName,
+                            "note" to groupNote,
+                            "creator" to groupCreator,
+                            "members" to groupMembers
+                        )
                                 // 현재 사용자 정보를 Firestore에서 가져오기
                                 if (currentUserId == null) {
                                     println("GroupScreen: currentUserId is null")
@@ -840,44 +817,44 @@ fun GroupDetailPanel(
                                 
                                 println("GroupScreen: fromUserName determined: $fromUserName")
                                 
-                                selectedFriends.forEach { friendId ->
-                                    println("GroupScreen: Sending group invite to $friendId for group $groupId")
-                                    // Firestore groupInvites
-                                    FirebaseFirestore.getInstance().collection("users")
-                                        .document(friendId)
-                                        .collection("groupInvites")
-                                        .document(groupId)
-                                        .set(groupData)
-                                    // 알림 전송 (Firestore)
-                                    val inviteNotification = mapOf(
-                                        "type" to "groupInvite",
-                                        "fromUserId" to (currentUserId ?: ""),
+                        selectedFriends.forEach { friendId ->
+                            println("GroupScreen: Sending group invite to $friendId for group $groupId")
+                            // Firestore groupInvites
+                            FirebaseFirestore.getInstance().collection("users")
+                                .document(friendId)
+                                .collection("groupInvites")
+                                .document(groupId)
+                                .set(groupData)
+                            // 알림 전송 (Firestore)
+                            val inviteNotification = mapOf(
+                                "type" to "groupInvite",
+                                "fromUserId" to (currentUserId ?: ""),
                                         "fromUserName" to fromUserName,
-                                        "groupId" to groupId,
-                                        "groupName" to groupName,
-                                        "timestamp" to System.currentTimeMillis()
-                                    )
+                                "groupId" to groupId,
+                                "groupName" to groupName,
+                                "timestamp" to System.currentTimeMillis()
+                            )
                                     println("GroupScreen: Adding notification to $friendId - type: groupInvite, groupId: $groupId, fromUserName: $fromUserName")
-                                    FirebaseFirestore.getInstance().collection("users")
-                                        .document(friendId)
-                                        .collection("notifications")
-                                        .add(inviteNotification)
-                                    // 알림 전송 (Realtime DB)
-                                    val ref = FirebaseDatabase.getInstance().reference
-                                        .child("notifications")
-                                        .child(friendId)
-                                        .push()
-                                    val notificationId = ref.key ?: ""
-                                    val inviteNotificationWithId = inviteNotification.toMutableMap()
-                                    inviteNotificationWithId["id"] = notificationId
-                                    ref.setValue(inviteNotificationWithId)
-                                }
+                            FirebaseFirestore.getInstance().collection("users")
+                                .document(friendId)
+                                .collection("notifications")
+                                .add(inviteNotification)
+                            // 알림 전송 (Realtime DB)
+                            val ref = FirebaseDatabase.getInstance().reference
+                                .child("notifications")
+                                .child(friendId)
+                                .push()
+                            val notificationId = ref.key ?: ""
+                            val inviteNotificationWithId = inviteNotification.toMutableMap()
+                            inviteNotificationWithId["id"] = notificationId
+                            ref.setValue(inviteNotificationWithId)
+                        }
                                 
                                 // UI 업데이트는 메인 스레드에서
                                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                                    showAddMemberDialog = false
-                                    selectedFriends = emptySet()
-                                    android.widget.Toast.makeText(context, "초대가 전송되었습니다", android.widget.Toast.LENGTH_SHORT).show()
+                        showAddMemberDialog = false
+                        selectedFriends = emptySet()
+                        android.widget.Toast.makeText(context, "초대가 전송되었습니다", android.widget.Toast.LENGTH_SHORT).show()
                                 }
                             } catch (e: Exception) {
                                 // 에러 처리

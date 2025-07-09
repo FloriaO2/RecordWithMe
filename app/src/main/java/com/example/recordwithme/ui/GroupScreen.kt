@@ -64,6 +64,11 @@ import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import android.util.Base64
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 
 // 데이터 모델
 data class UserGroup(
@@ -72,7 +77,9 @@ data class UserGroup(
     val membersCount: Int = 0,
     val note: String = "",
     val creator: String = "",
-    val members: List<String> = emptyList()
+    val members: List<String> = emptyList(),
+    val thumbnailUrl: String? = null,
+    val thumbnailIsBase64: Boolean = false
 )
 
 @Composable
@@ -132,6 +139,16 @@ fun GroupScreen(navController: NavController) {
                 val creator = document.getString("creator") ?: ""
                 val members = document.get("members") as? List<String> ?: emptyList()
                 val membersCount = members.size
+                // 썸네일 정보는 groups/{groupId}에서 가져옴
+                var thumbnailUrl: String? = null
+                var thumbnailIsBase64 = false
+                try {
+                    val groupDoc = firestore.collection("groups").document(groupId).get().await()
+                    thumbnailUrl = groupDoc.getString("thumbnailUrl")
+                    thumbnailIsBase64 = groupDoc.getBoolean("thumbnailIsBase64") ?: false
+                } catch (e: Exception) {
+                    android.util.Log.e("GroupScreen", "썸네일 정보 로딩 실패: ${e.message}")
+                }
 
                 val group = UserGroup(
                     id = groupId,
@@ -139,7 +156,9 @@ fun GroupScreen(navController: NavController) {
                     membersCount = membersCount,
                     note = note,
                     creator = creator,
-                    members = members
+                    members = members,
+                    thumbnailUrl = thumbnailUrl,
+                    thumbnailIsBase64 = thumbnailIsBase64
                 )
                 groups.add(group)
             }
@@ -414,9 +433,42 @@ fun GroupScreen(navController: NavController) {
                     end = (screenWidth.value * 0.075f).dp,
                     bottom = (screenHeight.value * 0.05f).dp
                 ),
-            containerColor = MaterialTheme.colorScheme.primary
+            containerColor = Color(0xFF000000)
         ) {
-            Icon(imageVector = Icons.Filled.Add, contentDescription = "Add Group")
+            Icon(imageVector = Icons.Filled.Add, contentDescription = "Add Group", tint = Color.White)
+        }
+    }
+}
+
+@Composable
+fun GroupBase64Image(base64String: String, modifier: Modifier = Modifier) {
+    var bitmap by remember(base64String) { mutableStateOf<android.graphics.Bitmap?>(null) }
+
+    LaunchedEffect(base64String) {
+        try {
+            android.util.Log.d("GroupBase64Image", "Base64 디코딩 시도: ${base64String.take(30)}...")
+            val bytes = Base64.decode(base64String, Base64.DEFAULT)
+            bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+            if (bitmap != null) {
+                android.util.Log.d("GroupBase64Image", "Base64 디코딩 성공, bitmap 생성됨")
+            } else {
+                android.util.Log.e("GroupBase64Image", "Base64 디코딩 실패: bitmap == null")
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("GroupBase64Image", "Base64 디코딩 예외: ${e.message}")
+        }
+    }
+
+    if (bitmap != null) {
+        Image(
+            bitmap = bitmap!!.asImageBitmap(),
+            contentDescription = "그룹 썸네일",
+            modifier = modifier,
+            contentScale = ContentScale.Crop
+        )
+    } else {
+        Box(modifier = modifier.background(Color.LightGray), contentAlignment = Alignment.Center) {
+            Text("이미지 로딩 중...", color = Color.White)
         }
     }
 }
@@ -488,8 +540,19 @@ fun GroupItem(
                     modifier = Modifier
                         .size((localScreenWidth.value * 0.1f).dp)
                         .clip(RoundedCornerShape((localScreenWidth.value * 0.02f).dp))
-                        .background(Color.Gray)
-                )
+                        .background(Color.Gray),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (!group.thumbnailUrl.isNullOrEmpty() && group.thumbnailIsBase64) {
+                        android.util.Log.d("GroupItem", "썸네일 조건 통과: groupId=${group.id}, isBase64=${group.thumbnailIsBase64}, url=${group.thumbnailUrl?.take(30)}...")
+                        GroupBase64Image(
+                            base64String = group.thumbnailUrl,
+                            modifier = Modifier.size((localScreenWidth.value * 0.1f).dp).clip(RoundedCornerShape((localScreenWidth.value * 0.02f).dp))
+                        )
+                    } else {
+                        android.util.Log.d("GroupItem", "썸네일 조건 불충족: groupId=${group.id}, isBase64=${group.thumbnailIsBase64}, url=${group.thumbnailUrl}")
+                    }
+                }
                 Spacer(modifier = Modifier.width((localScreenWidth.value * 0.04f).dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -802,14 +865,7 @@ fun GroupDetailPanel(
                                         selectedFriends = if (checked) selectedFriends + id else selectedFriends - id
                                     }
                                 )
-                                // @recordwith.me면 name(있을 때만), 아니면 이메일 전체
-                                val isRecordWithMe = id.endsWith("@recordwith.me")
-                                val displayText = if (isRecordWithMe && name.isNotEmpty()) {
-                                    name
-                                } else {
-                                    id
-                                }
-                                Text(text = displayText)
+                                Text(text = name)
                             }
                         }
                     }

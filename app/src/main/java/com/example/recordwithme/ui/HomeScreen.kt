@@ -64,11 +64,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -380,8 +383,15 @@ fun HomeScreen() {
                                     text = selectedGroup!!.name,
                                     color = Color.White,
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 50.sp,
+                                    fontSize = 40.sp,
                                     fontStyle = FontStyle.Italic,
+                                    style = TextStyle(
+                                        shadow = Shadow(
+                                            color = Color.Black,
+                                            offset = Offset(4f, 4f),
+                                            blurRadius = 4f
+                                        )
+                                    ),
                                     modifier = Modifier
                                         .align(Alignment.BottomStart)
                                         .padding(20.dp)

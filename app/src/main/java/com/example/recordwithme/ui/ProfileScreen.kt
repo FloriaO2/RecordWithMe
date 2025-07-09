@@ -1067,7 +1067,7 @@ fun ProfileScreen(
                     .height((screenHeight.value * 0.06f).dp),
                 shape = RoundedCornerShape((screenWidth.value * 0.05f).dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF90CAF9),
+                    containerColor = Color(0xC9186FB2),
                     contentColor = Color.White
                 ),
                 contentPadding = PaddingValues(

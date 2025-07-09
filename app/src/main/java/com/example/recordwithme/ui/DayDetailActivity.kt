@@ -361,7 +361,7 @@ class PhotoAdapter(
                         if (accessToken != null) {
                             val musicKeywords = listOf("k-pop", "Korean", "노래", "music")
                             val searchQuery = (labels.take(3) + musicKeywords).joinToString(" ")
-                            val tracks = searchSpotifyTracks(searchQuery, accessToken)
+                            val tracks = searchSpotifyTracks(searchQuery, accessToken, labels)
                             Log.d("SpotifyDebug", "검색 쿼리: $searchQuery, 트랙 수: ${tracks.size}")
                             if (tracks.isNotEmpty()) {
                                 val playableTrack = tracks.firstOrNull { it.previewUrl != null }
@@ -383,6 +383,8 @@ class PhotoAdapter(
                                 } else {
                                     // iTunes에서 미리듣기 URL 시도
                                     val mostPopularTrack = tracks.maxByOrNull { it.popularity }
+                                    val secondPopularTrack = tracks.sortedByDescending { it.popularity }.getOrNull(1)
+                                    
                                     if (mostPopularTrack != null) {
                                         Log.d("SpotifyDebug", "iTunes 검색용 곡 정보(인기순): name=${mostPopularTrack.name}, artist=${mostPopularTrack.artist}, popularity=${mostPopularTrack.popularity}")
                                         val itunesPreviewUrl = getItunesPreviewUrl(mostPopularTrack.name, mostPopularTrack.artist)
@@ -400,6 +402,35 @@ class PhotoAdapter(
                                                 photoHolder.itemView.tag = mostPopularTrack
                                                 // 자동 재생
                                                 playPreviewUrl(itunesPreviewUrl, photoHolder, photoIdx, autoPlay = true)
+                                            }
+                                        } else if (secondPopularTrack != null) {
+                                            // 첫 번째 곡이 실패하면 두 번째 곡 시도
+                                            Log.d("SpotifyDebug", "첫 번째 곡 실패, 두 번째 곡 시도: name=${secondPopularTrack.name}, artist=${secondPopularTrack.artist}, popularity=${secondPopularTrack.popularity}")
+                                            val secondItunesPreviewUrl = getItunesPreviewUrl(secondPopularTrack.name, secondPopularTrack.artist)
+                                            if (secondItunesPreviewUrl != null) {
+                                                Log.d("SpotifyDebug", "두 번째 곡 iTunes 미리듣기 URL: $secondItunesPreviewUrl")
+                                                (photoHolder.itemView.context as? android.app.Activity)?.runOnUiThread {
+                                                    val musicText = photoHolder.musicText
+                                                    musicText.text = "🎵 ${secondPopularTrack.name} - ${secondPopularTrack.artist} (iTunes)"
+                                                    val playButton = photoHolder.playButton
+                                                    playButton.setImageResource(android.R.drawable.ic_media_pause)
+                                                    playButton.visibility = View.VISIBLE
+                                                    playButton.setOnClickListener {
+                                                        togglePlayPause(secondItunesPreviewUrl, photoHolder, photoIdx)
+                                                    }
+                                                    photoHolder.itemView.tag = secondPopularTrack
+                                                    // 자동 재생
+                                                    playPreviewUrl(secondItunesPreviewUrl, photoHolder, photoIdx, autoPlay = true)
+                                                }
+                                            } else {
+                                                (photoHolder.itemView.context as? android.app.Activity)?.runOnUiThread {
+                                                    photoHolder.musicOverlay.visibility = View.GONE
+                                                    android.widget.Toast.makeText(
+                                                        photoHolder.itemView.context,
+                                                        "미리듣기 가능한 곡이 없습니다.",
+                                                        android.widget.Toast.LENGTH_LONG
+                                                    ).show()
+                                                }
                                             }
                                         } else {
                                             (photoHolder.itemView.context as? android.app.Activity)?.runOnUiThread {
@@ -898,7 +929,7 @@ data class Track(
 )
 
 // Spotify API로 음악 검색하는 함수 (한국 음악 우선, 유명한 곡들)
-private fun searchSpotifyTracks(query: String, accessToken: String): List<Track> {
+private fun searchSpotifyTracks(query: String, accessToken: String, labels: List<String> = emptyList()): List<Track> {
     return try {
         // 한국 음악으로 검색 범위 제한 (장르: k-pop, korean, 한국어)
         val koreanQuery = "$query korean k-pop"
@@ -945,17 +976,20 @@ private fun searchSpotifyTracks(query: String, accessToken: String): List<Track>
                 tracks.add(Track(id, name, artist, album, previewUrl, popularity))
             }
             
-            // 인기도 순으로 정렬 (유명한 곡 우선)
+            // 라벨 가중치 1.5배 적용
             tracks.sortedByDescending { track ->
-                // Track 클래스에 popularity 필드가 없으므로 이름으로 유명도 추정
                 val popularKeywords = listOf("방탄소년단", "BTS", "블랙핑크", "BLACKPINK", "아이유", "IU", 
                     "세븐틴", "SEVENTEEN", "트와이스", "TWICE", "레드벨벳", "Red Velvet", "엑소", "EXO",
                     "뉴진스", "NewJeans", "르세라핌", "LE SSERAFIM", "아이브", "IVE", "스테이씨", "STAYC")
-                
-                popularKeywords.count { keyword ->
-                    track.name.contains(keyword, ignoreCase = true) || 
+                val labelScore = labels.count { label ->
+                    track.name.contains(label, ignoreCase = true) ||
+                    track.artist.contains(label, ignoreCase = true)
+                }
+                val keywordScore = popularKeywords.count { keyword ->
+                    track.name.contains(keyword, ignoreCase = true) ||
                     track.artist.contains(keyword, ignoreCase = true)
-                } + track.popularity
+                }
+                (labelScore * 1.5) + keywordScore + track.popularity
             }
         } else {
             emptyList()

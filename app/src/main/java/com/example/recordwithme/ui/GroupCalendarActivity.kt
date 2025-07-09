@@ -6,7 +6,6 @@ import android.os.Build
 import android.os.Bundle
 import android.view.Gravity
 import android.view.ViewGroup
-import android.widget.Button
 import android.widget.GridLayout
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -15,15 +14,9 @@ import androidx.core.app.ActivityOptionsCompat
 import com.example.recordwithme.R
 import java.util.Calendar
 import com.bumptech.glide.Glide
-import com.bumptech.glide.request.target.CustomTarget
-import com.bumptech.glide.request.transition.Transition
-import android.graphics.drawable.Drawable
 import com.google.firebase.firestore.FirebaseFirestore
-import android.graphics.drawable.ColorDrawable
 import android.util.Base64
 import android.graphics.BitmapFactory
-import android.graphics.drawable.BitmapDrawable
-import android.view.Gravity as AndroidGravity
 import android.app.Activity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.ActivityResultLauncher
@@ -35,18 +28,8 @@ import android.view.MotionEvent
 import android.view.View
 import kotlin.math.abs
 import android.util.Log
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.platform.ComposeView
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.zIndex
-import androidx.compose.ui.window.Dialog
 import com.example.recordwithme.MainActivity
-import com.example.recordwithme.ui.TopBarIconType
 
 class GroupCalendarActivity : AppCompatActivity() {
     private var year = 2024 
@@ -56,6 +39,7 @@ class GroupCalendarActivity : AppCompatActivity() {
     private lateinit var dayDetailLauncher: ActivityResultLauncher<Intent>
     private lateinit var grid: GridLayout
     private lateinit var gestureDetector: GestureDetector
+    private var startX: Float? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -109,6 +93,7 @@ class GroupCalendarActivity : AppCompatActivity() {
             textMonth.letterSpacing = 0f
         }
 
+
         // 제스처 디텍터 초기화
         gestureDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
             override fun onFling(
@@ -118,12 +103,12 @@ class GroupCalendarActivity : AppCompatActivity() {
                 velocityY: Float
             ): Boolean {
                 if (e1 == null) return false
-                
+
                 val diffX = e2.x - e1.x
                 val diffY = e2.y - e1.y
-                
+
                 Log.d("Gesture", "Fling detected: diffX=$diffX, diffY=$diffY, velocityX=$velocityX")
-                
+
                 // 수평 스와이프가 수직 스와이프보다 크고, 최소 거리 조건을 만족할 때
                 if (abs(diffX) > abs(diffY) && abs(diffX) > 50) {
                     if (diffX > 0) {
@@ -172,11 +157,6 @@ class GroupCalendarActivity : AppCompatActivity() {
         layoutYearMonth.addView(ivPrev)
         layoutYearMonth.addView(tvYearMonth)
         layoutYearMonth.addView(ivNext)
-
-        // 뒤로가기 버튼 클릭 리스너 연결
-        findViewById<Button>(R.id.btnBackToGroup).setOnClickListener {
-            onBackPressedDispatcher.onBackPressed()
-        }
 
         dayDetailLauncher = registerForActivityResult(
             ActivityResultContracts.StartActivityForResult()
@@ -236,9 +216,8 @@ class GroupCalendarActivity : AppCompatActivity() {
         layoutYearMonth.layoutParams = params
         val layoutWeekdays = findViewById<LinearLayout>(R.id.layoutWeekdays)
         val grid = findViewById<GridLayout>(R.id.gridCalendar)
-        val btnBackToGroup = findViewById<Button>(R.id.btnBackToGroup)
 
-        val uiElements = listOf(textMonth, layoutYearMonth, layoutWeekdays, grid, btnBackToGroup)
+        val uiElements = listOf(textMonth, layoutYearMonth, layoutWeekdays, grid)
 
         // 현재 UI 요소들에 페이드 아웃 애니메이션 적용
         uiElements.forEach { element ->

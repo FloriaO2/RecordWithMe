@@ -64,6 +64,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
@@ -282,8 +283,12 @@ fun HomeScreen() {
                                 modifier = Modifier
                                     .size(64.dp)
                                     .background(Color.LightGray, shape = CircleShape)
-                                    .then(
-                                        if (isSelected) Modifier.border(3.dp, Color(0xFF1976D2), CircleShape) else Modifier
+                                    .border(
+                                        width = if (isSelected) 3.dp else 1.dp,
+                                        color = if (isSelected) Color(0xFF1976D2) else Color(
+                                            0xCB000000
+                                        ),
+                                        shape = CircleShape
                                     ),
                                 contentAlignment = Alignment.Center
                             ) {
@@ -342,11 +347,20 @@ fun HomeScreen() {
                     item {
                         Box(
                             modifier = Modifier.fillMaxWidth().height(220.dp)
+                                                .padding(horizontal = 15.dp)
                         ) {
                             Card(
-                                modifier = Modifier.fillMaxSize(),
-                                shape= RoundedCornerShape(0.dp),
-                                colors = CardDefaults.cardColors(containerColor = Color.White)
+                                modifier = Modifier.fillMaxSize()
+                                    .border(
+                                        width = 1.5.dp,
+                                        color = Color(0x92000000),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ),
+                                shape= RoundedCornerShape(8.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color.White),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 30.dp) // 그림자 효과
+
+
                             ) {
                                 Box(
                                     modifier = Modifier
@@ -385,7 +399,7 @@ fun HomeScreen() {
                             Text(
                                 date,
                                 color = Color.Black,
-                                fontSize = 16.sp,
+                                fontSize = 28.sp,
                                 modifier = Modifier.padding(start = 16.dp)
                             )
                             Spacer(modifier = Modifier.height(8.dp))

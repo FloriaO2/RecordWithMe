@@ -652,7 +652,7 @@ fun ProfileScreen(
                     // Profile 텍스트는 항상 상단 중앙에 고정
                     Text(
                         "Profile", 
-                        fontSize = (screenWidth.value * 0.06f).sp, 
+                        fontSize = (screenWidth.value * 0.07f).sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(
                             top = (screenHeight.value * 0.012f).dp, 
@@ -827,7 +827,7 @@ fun ProfileScreen(
                                         onClick = { showWithdrawDialog = true },
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .offset(
+                                                .offset(
                                                 y = -(screenHeight.value * 0.015f).dp,
                                                 x = (screenWidth.value * 0.03f).dp
                                             )

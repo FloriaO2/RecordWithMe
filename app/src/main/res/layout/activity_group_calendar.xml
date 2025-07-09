@@ -44,21 +44,6 @@
             android:layout_marginTop="40dp"/>
     </LinearLayout>
 
-    <!-- 그룹 관리 창으로 돌아가기 버튼 복원 -->
-    <Button
-        android:id="@+id/btnBackToGroup"
-        android:layout_width="140dp"
-        android:layout_height="35dp"
-        android:text="그룹 관리 창으로 돌아가기"
-        android:textSize="10sp"
-        android:background="@drawable/btn_rounded_rect_navy"
-        android:paddingLeft="5dp"
-        android:paddingRight="5dp"
-        android:layout_below="@id/monthRow"
-        android:layout_marginTop="-60dp"
-        android:layout_marginStart="180dp"
-        android:layout_marginEnd="30dp"/>
-
     <!-- 요일 헤더 -->
     <LinearLayout
         android:id="@+id/layoutWeekdays"

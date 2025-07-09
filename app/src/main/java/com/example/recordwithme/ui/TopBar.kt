@@ -83,8 +83,8 @@ fun TopBar(onMenuClick: () -> Unit, iconType: TopBarIconType = TopBarIconType.Me
                             width, height
                         )
                     },
-                    color = Color(0xB9051A52), //곡선 색상
-                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 8f)
+                    color = Color(0xB7051A52), //곡선 색상
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 6f)
                 )
             }
 

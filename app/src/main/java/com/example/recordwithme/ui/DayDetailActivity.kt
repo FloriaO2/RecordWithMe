@@ -26,6 +26,7 @@ import androidx.recyclerview.widget.RecyclerView
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKeys
 import com.example.recordwithme.BuildConfig
+import com.example.recordwithme.R
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -98,16 +99,18 @@ class PhotoAdapter(
         // 기존 PhotoViewHolder 생성 코드
         val container = FrameLayout(context).apply {
             setBackgroundColor(Color.WHITE)
-            val padding = 32
-            setPadding(padding, padding, padding, padding)
+            val padding = 60 // 좌/우/아래 여백
+            val topPadding = (4 * context.resources.displayMetrics.density).toInt() // 위쪽만 24dp
+            setPadding(padding, topPadding, padding, padding)
             val params = ViewGroup.MarginLayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             )
-            params.bottomMargin = 32
+            params.bottomMargin = 60 //여백2
             layoutParams = params
+            background = androidx.core.content.ContextCompat.getDrawable(context, R.drawable.post_border)
         }
-        
+
         // 내부 컨테이너 (기존 LinearLayout)
         val innerContainer = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
@@ -116,7 +119,7 @@ class PhotoAdapter(
                 ViewGroup.LayoutParams.WRAP_CONTENT
             )
         }
-        
+
         val imageView = ImageView(context).apply {
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -125,7 +128,7 @@ class PhotoAdapter(
             scaleType = ImageView.ScaleType.FIT_CENTER
             adjustViewBounds = true
         }
-        
+
         // 음악 정보 오버레이 (처음에는 숨김)
         val musicText = TextView(context).apply {
             text = "🎵 이 순간과 어울리는 음악은 무엇일까요?"
@@ -133,17 +136,17 @@ class PhotoAdapter(
             textSize = 16f
             setTypeface(null, android.graphics.Typeface.BOLD)
             setPadding(0, 0, 16, 0)
-            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 0.85f)
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f) // weight 1f로 변경
             maxLines = 1
             ellipsize = android.text.TextUtils.TruncateAt.END
-            setShadowLayer(4f, 0f, 0f, Color.BLACK)
-            maxWidth = (180 * context.resources.displayMetrics.density).toInt() // 180dp 제한
+            setShadowLayer(8f, 0f, 0f, Color.BLACK)
+            maxWidth = (1000 * context.resources.displayMetrics.density).toInt() // 충분히 넓게 유지
         }
         val playButton = ImageButton(context).apply {
             setImageResource(android.R.drawable.ic_media_play)
             setBackgroundColor(Color.TRANSPARENT)
             setColorFilter(Color.BLACK)
-            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 0.15f)
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT) // WRAP_CONTENT로 변경
             visibility = View.GONE // 처음엔 안 보이게
         }
         val musicOverlay = LinearLayout(context).apply {
@@ -160,38 +163,59 @@ class PhotoAdapter(
             addView(musicText)
             addView(playButton)
         }
-        
+
         val descView = TextView(context).apply {
             setTextColor(Color.DKGRAY)
-            textSize = 15f
+            textSize = 18f
+            gravity = Gravity.CENTER
             setPadding(0, 16, 0, 16)
         }
         val divider = View(context).apply {
-            setBackgroundColor(Color.LTGRAY)
+            setBackgroundColor(Color.DKGRAY) // 더 진한 회색
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                2
+                3 // 기존 2에서 3으로 두껍게
             )
         }
         val commentsView = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(0, 8, 0, 8)
         }
+        // 댓글 입력란과 등록 버튼을 가로로 배치
+        val commentInputLayout = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        }
         val commentInput = EditText(context).apply {
             hint = "댓글을 입력하세요"
-            textSize = 13f
+            textSize = 18f
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            setPadding(24, 24, 24, 24)
         }
         val commentButton = Button(context).apply {
             text = "등록"
-            textSize = 13f
+            textSize = 16f
             setBackgroundColor(Color.BLACK)
             setTextColor(Color.WHITE)
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.MATCH_PARENT // 입력란과 높이 맞춤
+            ).apply {
+                leftMargin = 8
+            }
+            background = androidx.core.content.ContextCompat.getDrawable(context, R.drawable.btn_comment_rounded)
+            setPadding(32, 16, 32, 16)
         }
+        commentInputLayout.addView(commentInput)
+        commentInputLayout.addView(commentButton)
         val deleteButton = Button(context).apply {
-            text = "삭제"
-            textSize = 13f
-            setBackgroundColor(Color.BLACK)
+            text = "게시물 삭제"
+            textSize = 15f
             setTextColor(Color.WHITE)
+            background = androidx.core.content.ContextCompat.getDrawable(context, R.drawable.btn_delete_rounded)
         }
         val buttonSpacer = View(context).apply {
             layoutParams = LinearLayout.LayoutParams(
@@ -201,9 +225,9 @@ class PhotoAdapter(
         }
         val labelButton = Button(context).apply {
             text = "어울리는 음악 재생"
-            textSize = 13f
-            setBackgroundColor(Color.parseColor("#1976D2"))
+            textSize = 15f
             setTextColor(Color.WHITE)
+            background = androidx.core.content.ContextCompat.getDrawable(context, R.drawable.btn_music_rounded)
         }
         val deleteParams = LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
@@ -211,19 +235,26 @@ class PhotoAdapter(
         )
         deleteParams.topMargin = 12
         deleteButton.layoutParams = deleteParams
-        innerContainer.addView(imageView)
         innerContainer.addView(musicOverlay)
+        innerContainer.addView(imageView)
         innerContainer.addView(descView)
         innerContainer.addView(divider)
+        // 구분선과 댓글 사이 16dp 여백 추가
+        val dividerBottomSpace = View(context).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                (12 * context.resources.displayMetrics.density).toInt() // 16dp
+            )
+        }
+        innerContainer.addView(dividerBottomSpace)
         innerContainer.addView(commentsView)
-        innerContainer.addView(commentInput)
-        innerContainer.addView(commentButton)
+        innerContainer.addView(commentInputLayout) // 수정: 입력란+버튼 가로 배치
         innerContainer.addView(deleteButton)
         innerContainer.addView(buttonSpacer)
         innerContainer.addView(labelButton)
-        
+
         container.addView(innerContainer)
-        
+
         return PhotoViewHolder(imageView, descView, commentsView, commentInput, commentButton, deleteButton, labelButton, musicOverlay, musicText, playButton, container)
     }
 
@@ -246,7 +277,7 @@ class PhotoAdapter(
         } else if (photo.url.startsWith("https://")) {
             photoHolder.imageView.setImageResource(android.R.drawable.ic_menu_gallery)
         }
-        photoHolder.descView.text = if (photo.description.isBlank()) "+설명" else photo.description
+        photoHolder.descView.text = if (photo.description.isBlank()) "+ 설명을 추가해주세요." else photo.description
         photoHolder.descView.setTextColor(
             if (photo.description.isBlank()) Color.parseColor("#1976D2") else Color.DKGRAY
         )
@@ -279,16 +310,17 @@ class PhotoAdapter(
             val emptyView = TextView(photoHolder.commentsView.context).apply {
                 text = "댓글이 없습니다"
                 setTextColor(Color.LTGRAY)
-                textSize = 12f
+                textSize = 18f
             }
             photoHolder.commentsView.addView(emptyView)
         } else {
             for (comment in photo.comments) {
+                val leftPadding = (11 * photoHolder.commentsView.context.resources.displayMetrics.density).toInt()
                 val commentView = TextView(photoHolder.commentsView.context).apply {
                     text = "${comment.userId} : ${comment.text}"
-                    setTextColor(Color.GRAY)
-                    textSize = 13f
-                    setPadding(0, 4, 0, 4)
+                    setTextColor(Color.BLACK)
+                    textSize = 15f
+                    setPadding(leftPadding, 10, 0, 8) // 왼쪽만 16dp 패딩
                 }
                 photoHolder.commentsView.addView(commentView)
             }
@@ -384,7 +416,7 @@ class PhotoAdapter(
                                     // iTunes에서 미리듣기 URL 시도
                                     val mostPopularTrack = tracks.maxByOrNull { it.popularity }
                                     val secondPopularTrack = tracks.sortedByDescending { it.popularity }.getOrNull(1)
-                                    
+
                                     if (mostPopularTrack != null) {
                                         Log.d("SpotifyDebug", "iTunes 검색용 곡 정보(인기순): name=${mostPopularTrack.name}, artist=${mostPopularTrack.artist}, popularity=${mostPopularTrack.popularity}")
                                         val itunesPreviewUrl = getItunesPreviewUrl(mostPopularTrack.name, mostPopularTrack.artist)
@@ -521,21 +553,21 @@ class PhotoAdapter(
             }
             return
         }
-        
+
         // 이전 재생 중인 음악 정지
         stopCurrentMusic()
-        
+
         try {
             currentMediaPlayer = MediaPlayer().apply {
                 // 오디오 스트림 타입 설정 (미디어 볼륨)
                 setAudioStreamType(android.media.AudioManager.STREAM_MUSIC)
-                
+
                 // 볼륨 설정 (최대 볼륨의 80%)
                 val audioManager = photoHolder.itemView.context.getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
                 val maxVolume = audioManager.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC)
                 val targetVolume = (maxVolume * 0.8).toInt()
                 audioManager.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, targetVolume, 0)
-                
+
                 setDataSource(previewUrl)
                 prepareAsync()
                 setOnPreparedListener { player ->
@@ -574,10 +606,10 @@ class PhotoAdapter(
                 android.widget.Toast.LENGTH_SHORT
             ).show()
         }
-        
+
         Log.d("SpotifyPreview", "미리듣기 URL: $previewUrl")
     }
-    
+
     // 현재 재생 중인 음악 정지
     private fun stopCurrentMusic() {
         currentMediaPlayer?.let { player ->
@@ -589,7 +621,7 @@ class PhotoAdapter(
         currentMediaPlayer = null
         currentPlayingPosition = -1
     }
-    
+
     // Adapter 소멸 시 MediaPlayer 정리
     fun cleanup() {
         stopCurrentMusic()
@@ -625,56 +657,71 @@ class DayDetailActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
+
         // 시스템 UI(상단바, 하단바) 숨기기
         window.decorView.systemUiVisibility =
             View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
-            View.SYSTEM_UI_FLAG_FULLSCREEN or
-            View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-        
+                    View.SYSTEM_UI_FLAG_FULLSCREEN or
+                    View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+
         day = intent.getIntExtra("day", -1)
         year = intent.getIntExtra("year", -1)
         month = intent.getIntExtra("month", -1)
         groupId = intent.getStringExtra("groupId") ?: ""
         groupName = intent.getStringExtra("groupName") ?: ""
         val receivedTransitionName = intent.getStringExtra("transitionName") ?: ""
-        
+
         // 디버깅을 위한 로그
         Log.d("DayDetailActivity", "받은 groupId: $groupId")
         Log.d("DayDetailActivity", "받은 groupName: $groupName")
-        
+
         // 메인 레이아웃 생성
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
             setBackgroundColor(Color.WHITE)
             setPadding(32, 64, 32, 64)
-            
+
             // Shared Element Transition을 위한 transitionName 설정
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 transitionName = receivedTransitionName
             }
         }
-        
-        // 날짜 텍스트를 맨 위 중앙에 배치
-        val dateText = TextView(this).apply {
-            text = "${groupName}\n${year}년 ${month}월 ${day}일"
-            textSize = 32f
-            setTextColor(Color.BLACK)
+
+        val groupNameText = TextView(this).apply {
+            text = groupName
+            textSize = 18f
+            setTextColor(Color.parseColor("#1A237E")) // 남색
             setTypeface(null, android.graphics.Typeface.BOLD)
             gravity = Gravity.CENTER
-            setPadding(0, 32, 0, 8)
+            setPadding(0, 50, 0, 24)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
+        layout.addView(groupNameText)
+
+        // 날짜 텍스트
+        val dateText = TextView(this).apply {
+            text = "${year}년 ${month}월 ${day}일"
+            textSize = 20f
+            setTextColor(Color.parseColor("#212121")) // 남색
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, 16)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
         }
         layout.addView(dateText)
-        
+
+
         // 사진 개수 텍스트를 날짜 아래에 배치
         val photoCountText = TextView(this).apply {
             text = "이 날의 사진: 0장"
-            textSize = 14f
+            textSize = 16f
             setTextColor(Color.GRAY)
             gravity = Gravity.CENTER
             setPadding(0, 0, 0, 24)
@@ -684,7 +731,7 @@ class DayDetailActivity : AppCompatActivity() {
             )
         }
         layout.addView(photoCountText)
-        
+
         // 버튼들을 그 아래에 배치
         val buttonBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -697,7 +744,7 @@ class DayDetailActivity : AppCompatActivity() {
         }
 
         val backButton = Button(this).apply {
-            text = "◀ ${groupName} 화면으로 돌아가기"
+            text = "◀"
             textSize = 30f
             setTextColor(Color.BLACK)
             setBackgroundColor(Color.TRANSPARENT)
@@ -725,14 +772,14 @@ class DayDetailActivity : AppCompatActivity() {
         buttonBar.addView(space)
         buttonBar.addView(addButton)
         layout.addView(buttonBar)
-        
+
         // RecyclerView 생성
         val recyclerView = RecyclerView(this).apply {
             layoutManager = LinearLayoutManager(this@DayDetailActivity)
             setBackgroundColor(Color.WHITE)
         }
         layout.addView(recyclerView)
-        
+
         // ActivityResultLauncher 등록 (갤러리에서 사진 선택)
         galleryLauncher = registerForActivityResult(
             androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
@@ -745,7 +792,7 @@ class DayDetailActivity : AppCompatActivity() {
                 }
             }
         }
-        
+
         // 데이터 새로고침 함수 정의
         fun loadPhotos() {
             CoroutineScope(Dispatchers.Main).launch {
@@ -762,7 +809,7 @@ class DayDetailActivity : AppCompatActivity() {
                     val photoCount = snapshot.size()
                     // photoCountText 업데이트
                     photoCountText.text = "이 날의 사진: ${photoCount}장"
-                    
+
                     val photoList = mutableListOf<PhotoData>()
                     val photoDocIds = mutableListOf<String>()
                     for (document in snapshot.documents) {
@@ -802,7 +849,7 @@ class DayDetailActivity : AppCompatActivity() {
                 } catch (e: Exception) {
                     // photoCountText 업데이트 (에러 시)
                     photoCountText.text = "이 날의 사진: 0장"
-                    
+
                     recyclerView.adapter = PhotoAdapter(
                         dateString = "${groupName}\n${year}년 ${month}월 ${day}일",
                         photoCount = 0,
@@ -817,14 +864,14 @@ class DayDetailActivity : AppCompatActivity() {
                 }
             }
         }
-        
+
         // 최초 데이터 로드
         if (groupId.isNotEmpty()) {
             loadPhotos()
         }
-        
+
         loadPhotosFunc = { loadPhotos() }
-        
+
         // 그룹 이름이 없으면 Firestore에서 조회
         if (groupName.isEmpty() && groupId.isNotEmpty()) {
             Log.d("DayDetailActivity", "Firestore에서 그룹 이름 조회 시작")
@@ -847,19 +894,19 @@ class DayDetailActivity : AppCompatActivity() {
         } else {
             Log.d("DayDetailActivity", "groupName이 이미 있음: $groupName")
         }
-        
+
         setContentView(layout)
-        
+
         // Shared Element Transition 설정 - 속도 조절 및 배경 유지
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             val transition = android.transition.TransitionInflater.from(this)
                 .inflateTransition(android.R.transition.move)
-            
+
             // 애니메이션 지속 시간을 늘려서 더 부드럽게
             transition.duration = 800
-            
+
             window.sharedElementEnterTransition = transition
-            
+
             // 배경이 사라지지 않도록 설정
             window.allowEnterTransitionOverlap = false
             window.allowReturnTransitionOverlap = false
@@ -935,12 +982,12 @@ private fun searchSpotifyTracks(query: String, accessToken: String, labels: List
         val koreanQuery = "$query korean k-pop"
         val encodedQuery = java.net.URLEncoder.encode(koreanQuery, "UTF-8")
         val url = URL("https://api.spotify.com/v1/search?q=$encodedQuery&type=track&limit=10&market=US")
-        
+
         val connection = url.openConnection() as HttpURLConnection
         connection.requestMethod = "GET"
         connection.setRequestProperty("Authorization", "Bearer $accessToken")
         connection.setRequestProperty("Content-Type", "application/json")
-        
+
         val responseCode = connection.responseCode
         if (responseCode == HttpURLConnection.HTTP_OK) {
             val response = connection.inputStream.bufferedReader().use { it.readText() }
@@ -948,7 +995,7 @@ private fun searchSpotifyTracks(query: String, accessToken: String, labels: List
             val jsonObject = JSONObject(response)
             val tracksObject = jsonObject.getJSONObject("tracks")
             val itemsArray = tracksObject.getJSONArray("items")
-            
+
             val tracks = mutableListOf<Track>()
             for (i in 0 until itemsArray.length()) {
                 val trackObject = itemsArray.getJSONObject(i)
@@ -957,7 +1004,7 @@ private fun searchSpotifyTracks(query: String, accessToken: String, labels: List
                 val previewUrl = if (trackObject.has("preview_url") && !trackObject.isNull("preview_url")) {
                     trackObject.getString("preview_url")
                 } else null
-                
+
                 val artist = try {
                     val artistsArray = trackObject.getJSONArray("artists")
                     if (artistsArray.length() > 0) {
@@ -968,26 +1015,26 @@ private fun searchSpotifyTracks(query: String, accessToken: String, labels: List
                 } catch (e: Exception) {
                     "Unknown Artist"
                 }
-                
+
                 val albumObject = trackObject.getJSONObject("album")
                 val album = albumObject.getString("name")
                 val popularity = trackObject.optInt("popularity", 0)
-                
+
                 tracks.add(Track(id, name, artist, album, previewUrl, popularity))
             }
-            
+
             // 라벨 가중치 1.5배 적용
             tracks.sortedByDescending { track ->
-                val popularKeywords = listOf("방탄소년단", "BTS", "블랙핑크", "BLACKPINK", "아이유", "IU", 
+                val popularKeywords = listOf("방탄소년단", "BTS", "블랙핑크", "BLACKPINK", "아이유", "IU",
                     "세븐틴", "SEVENTEEN", "트와이스", "TWICE", "레드벨벳", "Red Velvet", "엑소", "EXO",
                     "뉴진스", "NewJeans", "르세라핌", "LE SSERAFIM", "아이브", "IVE", "스테이씨", "STAYC")
                 val labelScore = labels.count { label ->
                     track.name.contains(label, ignoreCase = true) ||
-                    track.artist.contains(label, ignoreCase = true)
+                            track.artist.contains(label, ignoreCase = true)
                 }
                 val keywordScore = popularKeywords.count { keyword ->
                     track.name.contains(keyword, ignoreCase = true) ||
-                    track.artist.contains(keyword, ignoreCase = true)
+                            track.artist.contains(keyword, ignoreCase = true)
                 }
                 (labelScore * 1.5) + keywordScore + track.popularity
             }

@@ -64,7 +64,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
@@ -286,7 +285,7 @@ fun HomeScreen() {
                                     .border(
                                         width = if (isSelected) 3.dp else 1.dp,
                                         color = if (isSelected) Color(0xFF1976D2) else Color(
-                                            0xCB000000
+                                            0x56020202
                                         ),
                                         shape = CircleShape
                                     ),
@@ -352,8 +351,8 @@ fun HomeScreen() {
                             Card(
                                 modifier = Modifier.fillMaxSize()
                                     .border(
-                                        width = 1.5.dp,
-                                        color = Color(0x92000000),
+                                        width = 1.3.dp,
+                                        color = Color(0x51000000),
                                         shape = RoundedCornerShape(8.dp)
                                     ),
                                 shape= RoundedCornerShape(8.dp),
@@ -365,7 +364,7 @@ fun HomeScreen() {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .background(Color(0xD02196F3)), //대표사진 배경컬러
+                                        .background(Color(0xFFFFF8F0)), //대표사진 배경컬러
                                     contentAlignment = Alignment.Center
                                 ) {
                                     if (representativePhoto != null) {
@@ -399,7 +398,7 @@ fun HomeScreen() {
                             Text(
                                 date,
                                 color = Color.Black,
-                                fontSize = 28.sp,
+                                fontSize = 19.sp,
                                 modifier = Modifier.padding(start = 16.dp)
                             )
                             Spacer(modifier = Modifier.height(8.dp))

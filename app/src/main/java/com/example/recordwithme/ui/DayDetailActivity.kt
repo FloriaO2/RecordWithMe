@@ -306,16 +306,17 @@ class PhotoAdapter(
                 .show()
         }
         photoHolder.commentsView.removeAllViews()
+        val leftPadding = (11 * photoHolder.commentsView.context.resources.displayMetrics.density).toInt()
         if (photo.comments.isEmpty()) {
             val emptyView = TextView(photoHolder.commentsView.context).apply {
                 text = "댓글이 없습니다"
                 setTextColor(Color.LTGRAY)
                 textSize = 18f
+                setPadding(leftPadding, 10, 0, 8) // 왼쪽만 16dp 패딩
             }
             photoHolder.commentsView.addView(emptyView)
         } else {
             for (comment in photo.comments) {
-                val leftPadding = (11 * photoHolder.commentsView.context.resources.displayMetrics.density).toInt()
                 val commentView = TextView(photoHolder.commentsView.context).apply {
                     text = "${comment.userId} : ${comment.text}"
                     setTextColor(Color.BLACK)

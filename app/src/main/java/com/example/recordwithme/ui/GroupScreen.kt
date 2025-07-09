@@ -24,8 +24,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarToday
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -460,12 +461,12 @@ fun GroupItem(
             .padding(horizontal = 0.dp, vertical = (localScreenHeight.value * 0.01f).dp)
             .border(
                 width = 1.dp,
-                color = if (isExpanded) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else Color.LightGray,
+                color = if (isExpanded) Color(0xFF1A237E) else Color.LightGray,
                 shape = RoundedCornerShape((localScreenWidth.value * 0.02f).dp)
             ),
         shape = RoundedCornerShape((localScreenWidth.value * 0.02f).dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isExpanded) Color(0xFFF5F5F5) else Color.Transparent
+            containerColor = if (isExpanded) Color(0x0D707FDE) else Color.Transparent
         ),
         elevation = if (isExpanded) CardDefaults.cardElevation(defaultElevation = (localScreenWidth.value * 0.005f).dp) else CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
@@ -507,20 +508,65 @@ fun GroupItem(
                         )
                     )
                 }
-                IconButton(
-                    onClick = {
-                        val intent = android.content.Intent(context, com.example.recordwithme.ui.GroupCalendarActivity::class.java)
-                        intent.putExtra("groupId", group.id)
-                        intent.putExtra("groupName", group.name)
-                        context.startActivity(intent)
-                    },
-                    modifier = Modifier.size((localScreenWidth.value * 0.07f).dp)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy((localScreenWidth.value * 0.02f).dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.CalendarToday,
-                        contentDescription = "그룹 캘린더 바로가기",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
+                    // 탈퇴 아이콘 (상세 정보가 열렸을 때만 표시)
+                    if (isExpanded) {
+                        var showLeaveDialog by remember { mutableStateOf(false) }
+                        
+                        IconButton(
+                            onClick = { showLeaveDialog = true },
+                            modifier = Modifier.size((localScreenWidth.value * 0.07f).dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.ExitToApp,
+                                contentDescription = "그룹 탈퇴",
+                                tint = Color.Red
+                            )
+                        }
+                        
+                        // 탈퇴 확인 다이얼로그
+                        if (showLeaveDialog) {
+                            AlertDialog(
+                                onDismissRequest = { showLeaveDialog = false },
+                                title = { Text("정말 탈퇴하시겠습니까?") },
+                                text = { 
+                                    Text("더 이상 ${group.name} 그룹에 접근할 수 없습니다.")
+                                },
+                                confirmButton = {
+                                    TextButton(onClick = {
+                                        showLeaveDialog = false
+                                        onLeaveGroup(group)
+                                    }) {
+                                        Text("탈퇴")
+                                    }
+                                },
+                                dismissButton = {
+                                    TextButton(onClick = { showLeaveDialog = false }) {
+                                        Text("취소")
+                                    }
+                                }
+                            )
+                        }
+                    }
+                    
+                    // 캘린더 아이콘
+                    IconButton(
+                        onClick = {
+                            val intent = android.content.Intent(context, com.example.recordwithme.ui.GroupCalendarActivity::class.java)
+                            intent.putExtra("groupId", group.id)
+                            intent.putExtra("groupName", group.name)
+                            context.startActivity(intent)
+                        },
+                        modifier = Modifier.size((localScreenWidth.value * 0.07f).dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.CalendarToday,
+                            contentDescription = "그룹 캘린더 바로가기",
+                            tint = Color(0xFF1A237E)
+                        )
+                    }
                 }
             }
 
@@ -634,9 +680,14 @@ fun GroupDetailPanel(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = (screenWidth.value * 0.025f).dp, vertical = (screenHeight.value * 0f).dp)
+                            .padding(
+                                start = (screenWidth.value * 0.025f).dp,
+                                end = (screenWidth.value * 0.025f).dp,
+                                top = (screenHeight.value * 0f).dp,
+                                bottom = (screenHeight.value * 0.005f).dp
+                            )
                             .background(
-                                color = Color(0xFFF5F6FA),
+                                color = Color(0x56DCECFF),
                                 shape = RoundedCornerShape(10.dp)
                             )
                             .border(
@@ -656,21 +707,36 @@ fun GroupDetailPanel(
                     }
                 }
 
-                // 멤버 정보
+                // 멤버 정보 (클릭 가능)
+                var showMembers by remember { mutableStateOf(false) }
+                
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = (screenWidth.value * 0.035f).dp),
+                        .padding(start = (screenWidth.value * 0.03f).dp, bottom = (screenWidth.value * 0.0f).dp)
+                        .clickable { showMembers = !showMembers },
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "멤버 (${membersCount}명)",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontSize = (screenWidth.value * 0.04f).sp,
-                            fontWeight = FontWeight.SemiBold
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = if (showMembers) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                            contentDescription = if (showMembers) "멤버 목록 접기" else "멤버 목록 펼치기",
+                            tint = Color.Gray,
+                            modifier = Modifier.size((screenWidth.value * 0.04f).dp)
                         )
-                    )
+                        Spacer(modifier = Modifier.width((screenWidth.value * 0.02f).dp))
+                        Text(
+                            text = "멤버 (${membersCount}명)",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontSize = (screenWidth.value * 0.04f).sp,
+                                fontWeight = FontWeight.SemiBold
+                            ),
+                            modifier = Modifier.padding(bottom = (screenHeight.value * 0.00f).dp)
+                        )
+                    }
                     TextButton(
                         onClick = {
                             loadFriendsNotInGroup()
@@ -689,59 +755,29 @@ fun GroupDetailPanel(
                     }
                 }
 
-                // 멤버 목록 (사용자 정보 표시)
-                Column(
-                    verticalArrangement = Arrangement.spacedBy((screenHeight.value * 0.003f).dp),
-                            modifier = Modifier.padding(start = (screenWidth.value * 0.02f).dp)
-                ) {
-                    members.take(5).forEach { memberId ->
-                        MemberItem(
-                            memberId = memberId,
-                            screenWidth = screenWidth,
-                            screenHeight = screenHeight
+                // 멤버 목록 (조건부 표시)
+                if (showMembers) {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy((screenHeight.value * 0.001f).dp),
+                        modifier = Modifier.padding(
+                            start = (screenWidth.value * 0.02f).dp,
+                            top = (screenHeight.value * 0.002f).dp
                         )
-                    }
-
-                    if (members.size > 5) {
-                        Text(
-                            text = "... 외 ${members.size - 5}명",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontSize = (screenWidth.value * 0.035f).sp,
-                                color = Color.Gray
+                    ) {
+                        members.forEachIndexed { index, memberId ->
+                            MemberItem(
+                                memberId = memberId,
+                                screenWidth = screenWidth,
+                                screenHeight = screenHeight,
+                                isLast = index == members.size - 1
                             )
-                        )
+                        }
                     }
                 }
 
-                Spacer(modifier = Modifier.height((screenHeight.value * 0.005f).dp))
+                Spacer(modifier = Modifier.height((screenHeight.value * 0.00f).dp))
 
-                // 액션 버튼들
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.Start),
-                    verticalArrangement = Arrangement.spacedBy((screenHeight.value * 0.003f).dp)
-                ) {
-                    TextButton(
-                            onClick = {
-                                showLeaveDialog = true
-                            },
-                            modifier = Modifier.align(Alignment.Start)
-                        ) {
-                            Icon(
-                                Icons.Filled.Delete,
-                                contentDescription = "Leave",
-                                modifier = Modifier.size((screenWidth.value * 0.04f).dp),
-                                tint = Color.Red
-                            )
-                            Spacer(modifier = Modifier.width((screenWidth.value * 0.02f).dp))
-                            Text(
-                                text = "탈퇴",
-                                fontSize = (screenWidth.value * 0.035f).sp,
-                                color = Color.Red
-                            )
-                    }
-                }
+
             }
         }
     }
@@ -928,7 +964,8 @@ fun GroupDetailPanel(
 fun MemberItem(
     memberId: String,
     screenWidth: androidx.compose.ui.unit.Dp,
-    screenHeight: androidx.compose.ui.unit.Dp
+    screenHeight: androidx.compose.ui.unit.Dp,
+    isLast: Boolean = false
 ) {
     var memberName by remember { mutableStateOf("") }
     var memberEmail by remember { mutableStateOf("") }
@@ -955,13 +992,18 @@ fun MemberItem(
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.padding(vertical = (screenHeight.value * 0.005f).dp)
+        modifier = Modifier.padding(
+            top = (screenHeight.value * 0.0015f).dp,
+            bottom = if (isLast) (screenHeight.value * 0.025f).dp else (screenHeight.value * 0.0015f).dp
+        )
     ) {
-        Icon(
-            Icons.Filled.Person,
-            contentDescription = "Member",
-            modifier = Modifier.size((screenWidth.value * 0.04f).dp),
-            tint = Color.Gray
+        Spacer(modifier = Modifier.width((screenWidth.value * 0.09f).dp))
+        Text(
+            text = "•",
+            style = MaterialTheme.typography.bodyMedium.copy(
+                fontSize = (screenWidth.value * 0.035f).sp,
+                color = Color.Gray
+            )
         )
         Spacer(modifier = Modifier.width((screenWidth.value * 0.02f).dp))
 

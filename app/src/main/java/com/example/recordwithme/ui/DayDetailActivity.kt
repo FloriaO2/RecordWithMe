@@ -107,7 +107,7 @@ class PhotoAdapter(
             params.bottomMargin = 32
             layoutParams = params
         }
-        
+
         // 내부 컨테이너 (기존 LinearLayout)
         val innerContainer = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
@@ -116,7 +116,7 @@ class PhotoAdapter(
                 ViewGroup.LayoutParams.WRAP_CONTENT
             )
         }
-        
+
         val imageView = ImageView(context).apply {
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -125,7 +125,7 @@ class PhotoAdapter(
             scaleType = ImageView.ScaleType.FIT_CENTER
             adjustViewBounds = true
         }
-        
+
         // 음악 정보 오버레이 (처음에는 숨김)
         val musicText = TextView(context).apply {
             text = "🎵 이 순간과 어울리는 음악은 무엇일까요?"
@@ -160,7 +160,7 @@ class PhotoAdapter(
             addView(musicText)
             addView(playButton)
         }
-        
+
         val descView = TextView(context).apply {
             setTextColor(Color.DKGRAY)
             textSize = 15f
@@ -221,9 +221,9 @@ class PhotoAdapter(
         innerContainer.addView(deleteButton)
         innerContainer.addView(buttonSpacer)
         innerContainer.addView(labelButton)
-        
+
         container.addView(innerContainer)
-        
+
         return PhotoViewHolder(imageView, descView, commentsView, commentInput, commentButton, deleteButton, labelButton, musicOverlay, musicText, playButton, container)
     }
 
@@ -490,21 +490,21 @@ class PhotoAdapter(
             }
             return
         }
-        
+
         // 이전 재생 중인 음악 정지
         stopCurrentMusic()
-        
+
         try {
             currentMediaPlayer = MediaPlayer().apply {
                 // 오디오 스트림 타입 설정 (미디어 볼륨)
                 setAudioStreamType(android.media.AudioManager.STREAM_MUSIC)
-                
+
                 // 볼륨 설정 (최대 볼륨의 80%)
                 val audioManager = photoHolder.itemView.context.getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
                 val maxVolume = audioManager.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC)
                 val targetVolume = (maxVolume * 0.8).toInt()
                 audioManager.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, targetVolume, 0)
-                
+
                 setDataSource(previewUrl)
                 prepareAsync()
                 setOnPreparedListener { player ->
@@ -543,10 +543,10 @@ class PhotoAdapter(
                 android.widget.Toast.LENGTH_SHORT
             ).show()
         }
-        
+
         Log.d("SpotifyPreview", "미리듣기 URL: $previewUrl")
     }
-    
+
     // 현재 재생 중인 음악 정지
     private fun stopCurrentMusic() {
         currentMediaPlayer?.let { player ->
@@ -558,7 +558,7 @@ class PhotoAdapter(
         currentMediaPlayer = null
         currentPlayingPosition = -1
     }
-    
+
     // Adapter 소멸 시 MediaPlayer 정리
     fun cleanup() {
         stopCurrentMusic()
@@ -594,37 +594,37 @@ class DayDetailActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
+
         // 시스템 UI(상단바, 하단바) 숨기기
         window.decorView.systemUiVisibility =
             View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
-            View.SYSTEM_UI_FLAG_FULLSCREEN or
-            View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-        
+                    View.SYSTEM_UI_FLAG_FULLSCREEN or
+                    View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+
         day = intent.getIntExtra("day", -1)
         year = intent.getIntExtra("year", -1)
         month = intent.getIntExtra("month", -1)
         groupId = intent.getStringExtra("groupId") ?: ""
         groupName = intent.getStringExtra("groupName") ?: ""
         val receivedTransitionName = intent.getStringExtra("transitionName") ?: ""
-        
+
         // 디버깅을 위한 로그
         Log.d("DayDetailActivity", "받은 groupId: $groupId")
         Log.d("DayDetailActivity", "받은 groupName: $groupName")
-        
+
         // 메인 레이아웃 생성
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
             setBackgroundColor(Color.WHITE)
             setPadding(32, 64, 32, 64)
-            
+
             // Shared Element Transition을 위한 transitionName 설정
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 transitionName = receivedTransitionName
             }
         }
-        
+
         // 날짜 텍스트를 맨 위 중앙에 배치
         val dateText = TextView(this).apply {
             text = "${groupName}\n${year}년 ${month}월 ${day}일"
@@ -639,7 +639,7 @@ class DayDetailActivity : AppCompatActivity() {
             )
         }
         layout.addView(dateText)
-        
+
         // 사진 개수 텍스트를 날짜 아래에 배치
         val photoCountText = TextView(this).apply {
             text = "이 날의 사진: 0장"
@@ -653,7 +653,7 @@ class DayDetailActivity : AppCompatActivity() {
             )
         }
         layout.addView(photoCountText)
-        
+
         // 버튼들을 그 아래에 배치
         val buttonBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -694,14 +694,14 @@ class DayDetailActivity : AppCompatActivity() {
         buttonBar.addView(space)
         buttonBar.addView(addButton)
         layout.addView(buttonBar)
-        
+
         // RecyclerView 생성
         val recyclerView = RecyclerView(this).apply {
             layoutManager = LinearLayoutManager(this@DayDetailActivity)
             setBackgroundColor(Color.WHITE)
         }
         layout.addView(recyclerView)
-        
+
         // ActivityResultLauncher 등록 (갤러리에서 사진 선택)
         galleryLauncher = registerForActivityResult(
             androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
@@ -714,7 +714,7 @@ class DayDetailActivity : AppCompatActivity() {
                 }
             }
         }
-        
+
         // 데이터 새로고침 함수 정의
         fun loadPhotos() {
             CoroutineScope(Dispatchers.Main).launch {
@@ -731,7 +731,7 @@ class DayDetailActivity : AppCompatActivity() {
                     val photoCount = snapshot.size()
                     // photoCountText 업데이트
                     photoCountText.text = "이 날의 사진: ${photoCount}장"
-                    
+
                     val photoList = mutableListOf<PhotoData>()
                     val photoDocIds = mutableListOf<String>()
                     for (document in snapshot.documents) {
@@ -771,7 +771,7 @@ class DayDetailActivity : AppCompatActivity() {
                 } catch (e: Exception) {
                     // photoCountText 업데이트 (에러 시)
                     photoCountText.text = "이 날의 사진: 0장"
-                    
+
                     recyclerView.adapter = PhotoAdapter(
                         dateString = "${groupName}\n${year}년 ${month}월 ${day}일",
                         photoCount = 0,
@@ -786,14 +786,14 @@ class DayDetailActivity : AppCompatActivity() {
                 }
             }
         }
-        
+
         // 최초 데이터 로드
         if (groupId.isNotEmpty()) {
             loadPhotos()
         }
-        
+
         loadPhotosFunc = { loadPhotos() }
-        
+
         // 그룹 이름이 없으면 Firestore에서 조회
         if (groupName.isEmpty() && groupId.isNotEmpty()) {
             Log.d("DayDetailActivity", "Firestore에서 그룹 이름 조회 시작")
@@ -816,19 +816,19 @@ class DayDetailActivity : AppCompatActivity() {
         } else {
             Log.d("DayDetailActivity", "groupName이 이미 있음: $groupName")
         }
-        
+
         setContentView(layout)
-        
+
         // Shared Element Transition 설정 - 속도 조절 및 배경 유지
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             val transition = android.transition.TransitionInflater.from(this)
                 .inflateTransition(android.R.transition.move)
-            
+
             // 애니메이션 지속 시간을 늘려서 더 부드럽게
             transition.duration = 800
-            
+
             window.sharedElementEnterTransition = transition
-            
+
             // 배경이 사라지지 않도록 설정
             window.allowEnterTransitionOverlap = false
             window.allowReturnTransitionOverlap = false
@@ -904,12 +904,12 @@ private fun searchSpotifyTracks(query: String, accessToken: String): List<Track>
         val koreanQuery = "$query korean k-pop"
         val encodedQuery = java.net.URLEncoder.encode(koreanQuery, "UTF-8")
         val url = URL("https://api.spotify.com/v1/search?q=$encodedQuery&type=track&limit=10&market=US")
-        
+
         val connection = url.openConnection() as HttpURLConnection
         connection.requestMethod = "GET"
         connection.setRequestProperty("Authorization", "Bearer $accessToken")
         connection.setRequestProperty("Content-Type", "application/json")
-        
+
         val responseCode = connection.responseCode
         if (responseCode == HttpURLConnection.HTTP_OK) {
             val response = connection.inputStream.bufferedReader().use { it.readText() }
@@ -917,7 +917,7 @@ private fun searchSpotifyTracks(query: String, accessToken: String): List<Track>
             val jsonObject = JSONObject(response)
             val tracksObject = jsonObject.getJSONObject("tracks")
             val itemsArray = tracksObject.getJSONArray("items")
-            
+
             val tracks = mutableListOf<Track>()
             for (i in 0 until itemsArray.length()) {
                 val trackObject = itemsArray.getJSONObject(i)
@@ -926,7 +926,7 @@ private fun searchSpotifyTracks(query: String, accessToken: String): List<Track>
                 val previewUrl = if (trackObject.has("preview_url") && !trackObject.isNull("preview_url")) {
                     trackObject.getString("preview_url")
                 } else null
-                
+
                 val artist = try {
                     val artistsArray = trackObject.getJSONArray("artists")
                     if (artistsArray.length() > 0) {
@@ -937,24 +937,24 @@ private fun searchSpotifyTracks(query: String, accessToken: String): List<Track>
                 } catch (e: Exception) {
                     "Unknown Artist"
                 }
-                
+
                 val albumObject = trackObject.getJSONObject("album")
                 val album = albumObject.getString("name")
                 val popularity = trackObject.optInt("popularity", 0)
-                
+
                 tracks.add(Track(id, name, artist, album, previewUrl, popularity))
             }
-            
+
             // 인기도 순으로 정렬 (유명한 곡 우선)
             tracks.sortedByDescending { track ->
                 // Track 클래스에 popularity 필드가 없으므로 이름으로 유명도 추정
-                val popularKeywords = listOf("방탄소년단", "BTS", "블랙핑크", "BLACKPINK", "아이유", "IU", 
+                val popularKeywords = listOf("방탄소년단", "BTS", "블랙핑크", "BLACKPINK", "아이유", "IU",
                     "세븐틴", "SEVENTEEN", "트와이스", "TWICE", "레드벨벳", "Red Velvet", "엑소", "EXO",
                     "뉴진스", "NewJeans", "르세라핌", "LE SSERAFIM", "아이브", "IVE", "스테이씨", "STAYC")
-                
+
                 popularKeywords.count { keyword ->
-                    track.name.contains(keyword, ignoreCase = true) || 
-                    track.artist.contains(keyword, ignoreCase = true)
+                    track.name.contains(keyword, ignoreCase = true) ||
+                            track.artist.contains(keyword, ignoreCase = true)
                 } + track.popularity
             }
         } else {

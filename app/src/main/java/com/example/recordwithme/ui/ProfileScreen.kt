@@ -645,7 +645,6 @@ fun ProfileScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .alpha(profileAlpha)
                         .padding(vertical = (screenHeight.value * 0.012f).dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {

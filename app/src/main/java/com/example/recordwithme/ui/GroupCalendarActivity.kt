@@ -8,6 +8,7 @@ import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.GridLayout
+import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -49,7 +50,7 @@ import com.example.recordwithme.MainActivity
 import com.example.recordwithme.ui.TopBarIconType
 
 class GroupCalendarActivity : AppCompatActivity() {
-    private var year = 2024 
+    private var year = 2025 
     private var month = 7 // 1~12
     private var groupId: String = ""
     private var groupName: String = ""
@@ -146,7 +147,7 @@ class GroupCalendarActivity : AppCompatActivity() {
             gestureDetector.onTouchEvent(event)
         }
 
-        // 연/월 변경 버튼 + 연/월 표시 (상단 오른쪽)
+        // 연/월 변경 버튼 + 연/월 표시 (우측 상단)
         layoutYearMonth.removeAllViews()
         layoutYearMonth.orientation = LinearLayout.HORIZONTAL
         layoutYearMonth.gravity = Gravity.CENTER_VERTICAL
@@ -173,10 +174,8 @@ class GroupCalendarActivity : AppCompatActivity() {
         layoutYearMonth.addView(tvYearMonth)
         layoutYearMonth.addView(ivNext)
 
-        // 뒤로가기 버튼 클릭 리스너 연결
-        findViewById<Button>(R.id.btnBackToGroup).setOnClickListener {
-            onBackPressedDispatcher.onBackPressed()
-        }
+        // 그룹 이름 설정
+        findViewById<TextView>(R.id.textGroupName).text = groupName
 
         dayDetailLauncher = registerForActivityResult(
             ActivityResultContracts.StartActivityForResult()
@@ -199,7 +198,7 @@ class GroupCalendarActivity : AppCompatActivity() {
     // 이전 월로 이동
     private fun goToPreviousMonth() {
         if (month == 1) {
-            if (year > 2024) {
+            if (year > 2025) {
                 year--
                 month = 12
             }
@@ -236,9 +235,9 @@ class GroupCalendarActivity : AppCompatActivity() {
         layoutYearMonth.layoutParams = params
         val layoutWeekdays = findViewById<LinearLayout>(R.id.layoutWeekdays)
         val grid = findViewById<GridLayout>(R.id.gridCalendar)
-        val btnBackToGroup = findViewById<Button>(R.id.btnBackToGroup)
+        val textGroupName = findViewById<TextView>(R.id.textGroupName)
 
-        val uiElements = listOf(textMonth, layoutYearMonth, layoutWeekdays, grid, btnBackToGroup)
+        val uiElements = listOf(textMonth, layoutYearMonth, layoutWeekdays, grid, textGroupName)
 
         // 현재 UI 요소들에 페이드 아웃 애니메이션 적용
         uiElements.forEach { element ->

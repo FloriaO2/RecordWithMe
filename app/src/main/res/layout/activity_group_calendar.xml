@@ -38,26 +38,36 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="13"
-            android:orientation="horizontal"
-            android:gravity="end|center_vertical"
+            android:orientation="vertical"
+            android:gravity="end|top"
             android:layout_marginEnd="20dp"
             android:layout_marginTop="40dp"/>
     </LinearLayout>
 
-    <!-- 그룹 관리 창으로 돌아가기 버튼 복원 -->
-    <Button
-        android:id="@+id/btnBackToGroup"
-        android:layout_width="140dp"
-        android:layout_height="35dp"
-        android:text="그룹 관리 창으로 돌아가기"
-        android:textSize="10sp"
-        android:background="@drawable/btn_rounded_rect_navy"
-        android:paddingLeft="5dp"
-        android:paddingRight="5dp"
+    <!-- 그룹 이름과 홈 버튼 -->
+    <LinearLayout
+        android:id="@+id/groupInfoRow"
+        android:layout_width="230dp"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
         android:layout_below="@id/monthRow"
         android:layout_marginTop="-60dp"
-        android:layout_marginStart="180dp"
-        android:layout_marginEnd="30dp"/>
+        android:layout_alignParentRight="true"
+        android:layout_marginRight="20dp">
+
+        <TextView
+            android:id="@+id/textGroupName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="그룹 이름"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:textColor="#1A237E"
+            android:layout_marginEnd="0dp"
+            android:fontFamily="sans-serif-light"/>
+
+    </LinearLayout>
 
     <!-- 요일 헤더 -->
     <LinearLayout

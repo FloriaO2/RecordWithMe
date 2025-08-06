@@ -1,20 +1,7 @@
-- 바로 가기
-    - [앱 설명](https://www.notion.so/Record-with-Me-22b5a1b835578071914fe7b730ecaa66?pvs=21)
-    - [팀원 소개](https://www.notion.so/Record-with-Me-22b5a1b835578071914fe7b730ecaa66?pvs=21)
-    - [Tab 1 : 홈 화면](https://www.notion.so/Record-with-Me-22b5a1b835578071914fe7b730ecaa66?pvs=21)
-    - [Tab 2 : 프로필 화면](https://www.notion.so/Record-with-Me-22b5a1b835578071914fe7b730ecaa66?pvs=21)
-    - [Tab 3 : 알림 화면](https://www.notion.so/Record-with-Me-22b5a1b835578071914fe7b730ecaa66?pvs=21)
-    - [Tab 4 : 그룹 관리 화면](https://www.notion.so/Record-with-Me-22b5a1b835578071914fe7b730ecaa66?pvs=21)
-    - [Bonus 1 : 그룹 캘린더 화면](https://www.notion.so/Record-with-Me-22b5a1b835578071914fe7b730ecaa66?pvs=21)
-    - [Bonus 2 : 그룹 캘린더 상세 화면](https://www.notion.so/Record-with-Me-22b5a1b835578071914fe7b730ecaa66?pvs=21)
-    - [기술 소개](https://www.notion.so/Record-with-Me-22b5a1b835578071914fe7b730ecaa66?pvs=21)
-    - [소감](https://www.notion.so/Record-with-Me-22b5a1b835578071914fe7b730ecaa66?pvs=21)
 
 # **Record with Me : 추억을 나누다**
 
----
-
-![앱 아이콘.png](attachment:d4e17f93-21ee-42de-968b-7830740a77cc:앱_아이콘.png)
+<img width="300" height="300" alt="앱 아이콘" src="https://github.com/user-attachments/assets/b1d54a7c-74ff-424f-9ed1-4426f13e65f1" />
 
 여러분은 친구, 가족, 연인과의 순간들을 어떻게 기록하고 계신가요?
 
@@ -25,15 +12,13 @@
 어디에 뒀는지 몰라 헤맨 적,
 
 같은 사진을 여러 번 보내느라 번거로웠던 기억... 있으시죠?
-
 **RecordWithMe**로 소중한 사람과 함께 기록하세요.
 
 사진을 공유하고, 소통하며, 추억을 함께 만들어가는 공간입니다.
 
-![화면 기록 2025-07-09 오후 7.30.05.gif](attachment:1c0e5096-ebcb-4c12-9062-5f753a386a30:화면_기록_2025-07-09_오후_7.30.05.gif)
 
-# Record With Me
 
+![화면기록](https://github.com/user-attachments/assets/6e1896a6-c63c-4ee7-9fab-5684adb39f6d)
 # 기획
 
 ---
@@ -278,14 +263,12 @@ View Details 터치!
 | --- | --- |
 | **Kotlin** | 안드로이드 앱 개발 언어 |
 | **Jetpack Compose** | UI 프레임워크 |
-| 
-**Firebase** | • **Firebase Authentication**
-• **Firebase Firestore**
-• **Firebase Realtime Database** |
-| Google Cloud Vision API | 업로드한 사진을 Base64 인코딩 후 전달하여, 이미지에 대한 라벨(키워드) 추출 |
-| Spotify API | 추출된 라벨 키워드를 유사도 기반으로 검색하여 관련 노래 제목을 전달받음 |
-| itunes API | Spotify에서 제공하지 않는 PreviewUrl을 iTunes API를 통해 받아와 노래 미리듣기 구현 |
-| Github | 협업 툴 |
+| **Firebase** | • **Firebase Authentication**<br>• **Firebase Firestore**<br>• **Firebase Realtime Database** |
+| **Google Cloud Vision API** | 업로드한 사진을 Base64 인코딩 후 전달하여, 이미지에 대한 라벨(키워드) 추출 |
+| **Spotify API** | 추출된 라벨 키워드를 유사도 기반으로 검색하여 관련 노래 제목을 전달받음 |
+| **iTunes API** | Spotify에서 제공하지 않는 PreviewUrl을 iTunes API를 통해 받아와 노래 미리듣기 구현 |
+| **GitHub** | 협업 툴 |
+
 
 # 소감
 
